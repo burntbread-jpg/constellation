@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="좋아하는 작품의 이유를 따라 영화, 책, 애니를 건너가는 취향 아카이브" />
+  <title>취향 성좌 — 장르 밖으로 이어지는 작품</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <button class="brand" data-view="discover" aria-label="취향 성좌 홈"><span class="mark">✦</span><span>취향 성좌</span></button>
+    <nav aria-label="주요 메뉴">
+      <button class="nav-btn active" data-view="discover">탐색</button>
+      <button class="nav-btn" data-view="archive">내 성좌 <span id="archiveCount" class="count">2</span></button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="discoverView">
+      <div class="intro">
+        <p class="eyebrow">CROSS-MEDIA TASTE ARCHIVE</p>
+        <h1>당신은 장르를 좋아하는 것이<br />아닐지도 모릅니다.</h1>
+        <p class="lead">좋아하는 작품 하나를 골라보세요. 작품을 좋아한 <em>이유</em>를 따라 장르 밖으로 데려가 드릴게요.</p>
+        <div class="search-wrap">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m16 16 5 5"></path></svg>
+          <input id="searchInput" type="search" placeholder="작품 제목을 검색하세요" autocomplete="off" aria-label="작품 검색" />
+          <kbd>⌘ K</kbd>
+          <div id="searchResults" class="search-results" hidden></div>
+        </div>
+        <div class="quick-picks" aria-label="추천 검색어">
+          <span>지금 많이 연결하는 작품</span>
+          <button data-work="evangelion">에반게리온</button><button data-work="parasite">기생충</button><button data-work="her">Her</button>
+        </div>
+      </div>
+
+      <section id="workSection" class="work-section" aria-live="polite">
+        <div class="selected-work">
+          <div id="workPoster" class="poster poster-eva"><span>NEON<br/>GENESIS<br/><b>EVANGELION</b></span><i>1995</i></div>
+          <div class="work-copy">
+            <div class="work-meta"><span id="workType">ANIME</span><span>·</span><span id="workYear">1995</span><span class="award">🏆 Seiun</span></div>
+            <h2 id="workTitle">신세기 에반게리온</h2>
+            <p id="workCreator">안노 히데아키</p>
+            <blockquote id="workQuote">“고슴도치의 딜레마를 세계의 종말까지 밀어붙인 작품.”</blockquote>
+            <div id="tasteTags" class="tags"></div>
+            <div class="score-row"><span>BRIDGE SCORE</span><strong id="bridgeScore">94</strong><div class="meter"><i id="bridgeMeter" style="width:94%"></i></div><small>매체와 장르 사이를 연결하는 힘</small></div>
+          </div>
+          <button id="saveBtn" class="save-btn"><span>＋</span> 내 성좌에 담기</button>
+        </div>
+
+        <div class="journey-head">
+          <div><p class="eyebrow">CONNECTION MODE</p><h3>이 작품에서 어디로 갈까요?</h3></div>
+          <div id="modeTabs" class="mode-tabs" role="tablist">
+            <button data-mode="story">STORY</button><button data-mode="mood">MOOD</button><button data-mode="idea">IDEA</button><button data-mode="visual">VISUAL</button><button class="active" data-mode="deep">DEEP CUT <span>✦</span></button>
+          </div>
+        </div>
+        <div id="connectionIntro" class="connection-intro"></div>
+        <div id="recommendations" class="recommendations"></div>
+      </section>
+    </section>
+
+    <section id="archiveView" class="archive-view" hidden>
+      <div class="archive-head"><div><p class="eyebrow">MY CONSTELLATION</p><h1>나의 취향은<br />어떤 모양일까?</h1></div><p id="tasteStatement">당신은 SF를 좋아하는 사람이 아니라,<br/><strong>정체성과 고독을 다루는 작품</strong>을 좋아합니다.</p></div>
+      <div class="archive-grid">
+        <div class="map-card">
+          <div class="card-title"><span>취향 지도</span><small>작품을 눌러 연결을 확인하세요</small></div>
+          <div id="constellation" class="constellation" aria-label="저장한 작품의 취향 연결 지도"></div>
+          <div id="connectionDetail" class="map-detail">선을 따라가면 작품 사이에 숨어 있던 이유가 보입니다.</div>
+        </div>
+        <div class="dna-card">
+          <div class="card-title"><span>나의 Taste DNA</span><small>저장한 작품을 바탕으로</small></div>
+          <div id="dnaBars" class="dna-bars"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>
