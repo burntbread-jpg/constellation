@@ -1,0 +1,2 @@
+.save-btn:disabled{opacity:.55;cursor:wait}
+.archive-empty{color:#868a93;text-align:center;line-height:1.8;margin:auto;position:absolute;inset:0;display:grid;place-content:center}
