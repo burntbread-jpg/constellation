@@ -78,6 +78,29 @@
     </section>
   </main>
 
+  <dialog id="saveDialog" class="taste-dialog" aria-labelledby="saveDialogTitle">
+    <form id="saveForm" method="dialog">
+      <button class="dialog-close" type="button" aria-label="닫기" onclick="this.closest('dialog').close()">×</button>
+      <p class="eyebrow">TASTE NOTE</p>
+      <h2 id="saveDialogTitle">이 작품이 왜 좋았나요?</h2>
+      <p class="dialog-lead">별점과 한줄평을 바탕으로 비용 없이 Taste DNA를 만들어요.</p>
+      <fieldset class="rating-field">
+        <legend>별점</legend>
+        <div id="ratingInput" class="rating-input" role="radiogroup" aria-label="별점">
+          <button type="button" data-rating="1" aria-label="1점">★</button>
+          <button type="button" data-rating="2" aria-label="2점">★</button>
+          <button type="button" data-rating="3" aria-label="3점">★</button>
+          <button type="button" data-rating="4" aria-label="4점">★</button>
+          <button type="button" data-rating="5" aria-label="5점" class="active">★</button>
+        </div>
+      </fieldset>
+      <label class="comment-field">내 한줄평
+        <textarea id="commentInput" maxlength="500" rows="4" placeholder="예: 신지가 싫었는데 나이가 들수록 이해하게 된다."></textarea>
+      </label>
+      <div class="analysis-note"><span>✦</span><p><strong>무료 분석</strong> 작품 설명·태그·감상을 구조화해 저장합니다. 유료 AI 토큰은 사용하지 않습니다.</p></div>
+      <button id="analyzeSaveBtn" class="analyze-save" value="default">저장하고 Taste DNA 만들기</button>
+    </form>
+  </dialog>
   <div id="toast" class="toast" role="status"></div>
   <script src="app.js"></script>
 </body>

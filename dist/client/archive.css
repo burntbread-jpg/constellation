@@ -1,2 +1,26 @@
 .save-btn:disabled{opacity:.55;cursor:wait}
 .archive-empty{color:#868a93;text-align:center;line-height:1.8;margin:auto;position:absolute;inset:0;display:grid;place-content:center}
+
+.taste-dialog{width:min(520px,calc(100% - 32px));border:1px solid #343841;border-radius:18px;background:#111318;color:#f5f2e9;padding:0;box-shadow:0 28px 90px rgba(0,0,0,.7)}
+.taste-dialog::backdrop{background:rgba(5,7,10,.78);backdrop-filter:blur(8px)}
+.taste-dialog form{padding:32px;position:relative}
+.dialog-close{position:absolute;right:18px;top:16px;border:0;background:transparent;color:#91959e;font-size:28px;line-height:1;cursor:pointer}
+.taste-dialog h2{font-family:Georgia,serif;font-size:30px;margin:8px 0 10px}
+.dialog-lead{color:#a7aab2;margin:0 0 26px;line-height:1.6}
+.rating-field{border:0;padding:0;margin:0 0 22px}
+.rating-field legend,.comment-field{font-size:14px;font-weight:700;letter-spacing:.02em;color:#d9d7d0}
+.rating-input{display:flex;gap:8px;margin-top:10px}
+.rating-input button{border:0;background:transparent;color:#414651;font-size:31px;padding:0 2px;cursor:pointer;transition:color .15s,transform .15s}
+.rating-input button.lit{color:#e6bd62}
+.rating-input button:hover{transform:translateY(-2px)}
+.comment-field{display:grid;gap:10px}
+.comment-field textarea{resize:vertical;width:100%;box-sizing:border-box;border:1px solid #343841;border-radius:12px;background:#0b0d11;color:#f5f2e9;padding:14px 15px;font:inherit;line-height:1.6;outline:none}
+.comment-field textarea:focus{border-color:#88734b;box-shadow:0 0 0 3px rgba(230,189,98,.08)}
+.analysis-note{display:flex;gap:12px;align-items:flex-start;margin:18px 0 22px;padding:13px 14px;border:1px solid #2b3038;border-radius:12px;background:#171a20}
+.analysis-note span{color:#e6bd62}.analysis-note p{margin:0;color:#9da1aa;font-size:13px;line-height:1.55}.analysis-note strong{color:#d9d7d0;margin-right:5px}
+.analyze-save{width:100%;border:0;border-radius:12px;background:#e6bd62;color:#15130e;padding:15px;font-weight:800;font-size:15px;cursor:pointer}
+.analyze-save:disabled{opacity:.55;cursor:wait}
+.archive-review{margin-top:8px;color:#a6a9b1;font-size:12px;line-height:1.5}
+.archive-review strong{color:#e6bd62;font-weight:600}
+.dna-engine{display:block;margin-top:16px;color:#686d77;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.taste-dialog form{padding:26px 20px}.taste-dialog h2{font-size:25px}}
