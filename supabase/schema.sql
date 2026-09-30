@@ -24,6 +24,7 @@ create table if not exists public.works (
 create table if not exists public.archive_items (
   user_id uuid not null references public.profiles(id) on delete cascade,
   work_id text not null references public.works(id) on delete cascade,
+  work_json jsonb,
   rating smallint,
   my_comment text not null default '',
   ai_comment text not null default '',
@@ -35,11 +36,18 @@ create table if not exists public.archive_items (
 );
 
 alter table public.archive_items add column if not exists rating smallint;
+alter table public.archive_items add column if not exists work_json jsonb;
 alter table public.archive_items add column if not exists my_comment text not null default '';
 alter table public.archive_items add column if not exists ai_comment text not null default '';
 alter table public.archive_items add column if not exists analysis_status text not null default 'pending';
 alter table public.archive_items add column if not exists analysis_json jsonb;
 alter table public.archive_items add column if not exists updated_at timestamptz not null default now();
+
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'archive_items_rating_check') then
+    alter table public.archive_items add constraint archive_items_rating_check check (rating between 1 and 5);
+  end if;
+end $$;
 
 create table if not exists public.taste_tags (
   user_id uuid not null,
@@ -75,3 +83,52 @@ grant all on public.profiles to service_role;
 grant all on public.works to service_role;
 grant all on public.archive_items to service_role;
 grant all on public.taste_tags to service_role;
+
+create or replace function public.save_archive_analysis(
+  p_work jsonb,
+  p_item jsonb,
+  p_tags jsonb
+) returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.works (
+    id, external_id, title, original_title, creator, release_year,
+    media_type, poster_url, description, tags, source
+  ) values (
+    p_work->>'id', p_work->>'external_id', p_work->>'title', p_work->>'original_title',
+    p_work->>'creator', (p_work->>'release_year')::integer, p_work->>'media_type',
+    p_work->>'poster_url', p_work->>'description', coalesce(p_work->'tags', '[]'::jsonb),
+    p_work->>'source'
+  ) on conflict (id) do nothing;
+
+  insert into public.archive_items (
+    user_id, work_id, work_json, rating, my_comment, ai_comment, analysis_status, analysis_json
+  ) values (
+    (p_item->>'user_id')::uuid, p_item->>'work_id', p_item->'work_json', (p_item->>'rating')::smallint,
+    coalesce(p_item->>'my_comment', ''), coalesce(p_item->>'ai_comment', ''),
+    'complete', p_item->'analysis_json'
+  ) on conflict (user_id, work_id) do update set
+    rating = excluded.rating,
+    work_json = excluded.work_json,
+    my_comment = excluded.my_comment,
+    ai_comment = excluded.ai_comment,
+    analysis_status = excluded.analysis_status,
+    analysis_json = excluded.analysis_json,
+    updated_at = now();
+
+  delete from public.taste_tags
+    where user_id = (p_item->>'user_id')::uuid and work_id = p_item->>'work_id';
+
+  insert into public.taste_tags (user_id, work_id, tag, category, score, evidence, engine)
+  select
+    (tag->>'user_id')::uuid, tag->>'work_id', tag->>'tag', tag->>'category',
+    (tag->>'score')::double precision, tag->>'evidence', tag->>'engine'
+  from jsonb_array_elements(p_tags) as tag;
+end;
+$$;
+
+revoke all on function public.save_archive_analysis(jsonb, jsonb, jsonb) from public, anon, authenticated;
+grant execute on function public.save_archive_analysis(jsonb, jsonb, jsonb) to service_role;
