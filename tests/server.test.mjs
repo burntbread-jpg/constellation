@@ -29,6 +29,17 @@ function response(data, status = 200) {
   });
 }
 
+function vector(value) {
+  return String(value || '[]').slice(1, -1).split(',').filter(Boolean).map(Number);
+}
+
+function cosine(a, b) {
+  const dot = a.reduce((sum, value, index) => sum + value * (b[index] || 0), 0);
+  const magnitude = values => Math.sqrt(values.reduce((sum, value) => sum + value * value, 0));
+  const denominator = magnitude(a) * magnitude(b);
+  return denominator ? dot / denominator : 0;
+}
+
 function mockSupabase(url, init = {}) {
   const parsed = new URL(url);
   const table = parsed.pathname.split('/').at(-1);
@@ -43,6 +54,18 @@ function mockSupabase(url, init = {}) {
     state.tags = state.tags.filter(tag => !(tag.user_id === item.user_id && tag.work_id === item.work_id));
     state.tags.push(...tags);
     return response(null, 204);
+  }
+  if (method === 'POST' && table === 'taste_similarity_edges') {
+    const items = [...state.archive.values()].filter(item => item.user_id === body.p_user_id && item.taste_vector);
+    const edges = [];
+    for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) {
+      edges.push({
+        source_work_id: items[i].work_id,
+        target_work_id: items[j].work_id,
+        similarity: cosine(vector(items[i].taste_vector), vector(items[j].taste_vector))
+      });
+    }
+    return response(edges.sort((a, b) => b.similarity - a.similarity).slice(0, body.p_limit || 24));
   }
   if (method === 'POST' && table === 'works') {
     state.works.set(body.id, body);
@@ -236,4 +259,28 @@ test('JSON null and malformed archive IDs are reported as client errors', async 
     headers
   }), env);
   assert.equal(malformedId.status, 400);
+});
+
+test('Taste DNA is stored as a 25-dimensional vector and similarities are returned', async () => {
+  const works = [
+    {id: 'book:memory', title: '기억의 책', mediaType: 'BOOK', description: '기억과 상실, 가족'},
+    {id: 'film:memory', title: '기억의 영화', mediaType: 'FILM', description: '기억과 상실, 사랑'}
+  ];
+  for (const work of works) {
+    const result = await worker.fetch(new Request('https://site.test/api/archive', {
+      method: 'POST',
+      headers: {...headers, 'content-type': 'application/json'},
+      body: JSON.stringify({work, rating: 5, myComment: '기억과 상실이 좋았다'})
+    }), env);
+    assert.equal(result.status, 201);
+  }
+  for (const item of state.archive.values()) assert.equal(vector(item.taste_vector).length, 25);
+
+  const result = await worker.fetch(new Request('https://site.test/api/taste-similarities', {headers}), env);
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.engine, 'pgvector-cosine-v1');
+  assert.equal(data.dimensions, 25);
+  assert.equal(data.edges.length, 1);
+  assert.ok(data.edges[0].similarity > 0 && data.edges[0].similarity <= 1);
 });

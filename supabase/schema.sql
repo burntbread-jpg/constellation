@@ -5,6 +5,8 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+create extension if not exists vector with schema extensions;
+
 create table if not exists public.works (
   id text primary key,
   external_id text,
@@ -42,6 +44,7 @@ alter table public.archive_items add column if not exists ai_comment text not nu
 alter table public.archive_items add column if not exists analysis_status text not null default 'pending';
 alter table public.archive_items add column if not exists analysis_json jsonb;
 alter table public.archive_items add column if not exists updated_at timestamptz not null default now();
+alter table public.archive_items add column if not exists taste_vector extensions.vector(25);
 
 do $$ begin
   if not exists (select 1 from pg_constraint where conname = 'archive_items_rating_check') then
@@ -68,6 +71,9 @@ create index if not exists archive_items_user_created_idx
 
 create index if not exists taste_tags_user_score_idx
   on public.taste_tags (user_id, score desc);
+
+create index if not exists archive_items_taste_vector_idx
+  on public.archive_items using hnsw (taste_vector extensions.vector_cosine_ops);
 
 alter table public.profiles enable row level security;
 alter table public.works enable row level security;
@@ -105,11 +111,11 @@ begin
   ) on conflict (id) do nothing;
 
   insert into public.archive_items (
-    user_id, work_id, work_json, rating, my_comment, ai_comment, analysis_status, analysis_json
+    user_id, work_id, work_json, rating, my_comment, ai_comment, analysis_status, analysis_json, taste_vector
   ) values (
     (p_item->>'user_id')::uuid, p_item->>'work_id', p_item->'work_json', (p_item->>'rating')::smallint,
     coalesce(p_item->>'my_comment', ''), coalesce(p_item->>'ai_comment', ''),
-    'complete', p_item->'analysis_json'
+    'complete', p_item->'analysis_json', (p_item->>'taste_vector')::extensions.vector
   ) on conflict (user_id, work_id) do update set
     rating = excluded.rating,
     work_json = excluded.work_json,
@@ -117,6 +123,7 @@ begin
     ai_comment = excluded.ai_comment,
     analysis_status = excluded.analysis_status,
     analysis_json = excluded.analysis_json,
+    taste_vector = excluded.taste_vector,
     updated_at = now();
 
   delete from public.taste_tags
@@ -132,3 +139,33 @@ $$;
 
 revoke all on function public.save_archive_analysis(jsonb, jsonb, jsonb) from public, anon, authenticated;
 grant execute on function public.save_archive_analysis(jsonb, jsonb, jsonb) to service_role;
+
+create or replace function public.taste_similarity_edges(
+  p_user_id uuid,
+  p_limit integer default 24
+) returns table (
+  source_work_id text,
+  target_work_id text,
+  similarity double precision
+)
+language sql
+security definer
+set search_path = public, extensions
+stable
+as $$
+  select
+    a.work_id as source_work_id,
+    b.work_id as target_work_id,
+    1 - (a.taste_vector <=> b.taste_vector) as similarity
+  from public.archive_items a
+  join public.archive_items b
+    on a.user_id = b.user_id and a.work_id < b.work_id
+  where a.user_id = p_user_id
+    and a.taste_vector is not null
+    and b.taste_vector is not null
+  order by a.taste_vector <=> b.taste_vector
+  limit greatest(1, least(coalesce(p_limit, 24), 100));
+$$;
+
+revoke all on function public.taste_similarity_edges(uuid, integer) from public, anon, authenticated;
+grant execute on function public.taste_similarity_edges(uuid, integer) to service_role;
