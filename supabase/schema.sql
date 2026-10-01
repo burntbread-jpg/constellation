@@ -140,6 +140,85 @@ $$;
 revoke all on function public.save_connections(uuid, jsonb) from public, anon, authenticated;
 grant execute on function public.save_connections(uuid, jsonb) to service_role;
 
+create or replace function public.backfill_taste_graph(
+  p_user_id uuid
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  v_vectors integer := 0;
+  v_connections integer := 0;
+begin
+  update public.archive_items a
+  set taste_vector = (
+    select ('[' || string_agg(coalesce((
+      select (tag_item->>'score')::double precision
+      from jsonb_array_elements(coalesce(a.analysis_json->'tags', '[]'::jsonb)) tag_item
+      where tag_item->>'tag' = axis.tag
+      limit 1
+    ), 0)::text, ',' order by axis.ordinality) || ']')::extensions.vector
+    from unnest(array[
+      '고독','자아정체성','기억','상실','성장','가족','사랑과 친밀감','인간과 비인간',
+      '계급과 불평등','권력과 통제','존재와 죽음','연결의 실패','종말과 재난','미지와 우주',
+      '기술과 미래','꿈과 현실','신체와 변형','도시적 고독','공간과 경계','운명과 선택',
+      '정의와 죄책감','자연과 인간','멜랑콜리','불안과 공포','유머와 아이러니'
+    ]) with ordinality as axis(tag, ordinality)
+  )
+  where a.user_id = p_user_id
+    and a.taste_vector is null
+    and jsonb_typeof(a.analysis_json->'tags') = 'array';
+  get diagnostics v_vectors = row_count;
+
+  with ranked_pairs as (
+    select
+      a.user_id,
+      a.work_id as from_work_id,
+      b.work_id as to_work_id,
+      1 - (a.taste_vector <=> b.taste_vector) as score,
+      b.work_json,
+      coalesce((
+        select jsonb_agg(shared.tag order by shared.score desc)
+        from (
+          select ta.tag, greatest(ta.score, tb.score) as score
+          from public.taste_tags ta
+          join public.taste_tags tb
+            on tb.user_id = ta.user_id and tb.tag = ta.tag and tb.work_id = b.work_id
+          where ta.user_id = p_user_id and ta.work_id = a.work_id
+          order by greatest(ta.score, tb.score) desc
+          limit 3
+        ) shared
+      ), '[]'::jsonb) as shared_tags
+    from public.archive_items a
+    join public.archive_items b
+      on b.user_id = a.user_id and a.work_id < b.work_id
+    where a.user_id = p_user_id
+      and a.taste_vector is not null
+      and b.taste_vector is not null
+    order by a.taste_vector <=> b.taste_vector
+    limit 100
+  )
+  insert into public.connections (
+    user_id, from_work_id, to_work_id, connection_type,
+    reason, score, shared_tags, work_json
+  )
+  select
+    user_id, from_work_id, to_work_id, 'archive',
+    '기존 아카이브에서 Taste DNA 유사도 ' || round((score * 100)::numeric) || '%로 복원된 연결입니다.',
+    score, shared_tags, work_json
+  from ranked_pairs
+  where score > 0
+  on conflict (user_id, from_work_id, to_work_id, connection_type) do nothing;
+  get diagnostics v_connections = row_count;
+
+  return jsonb_build_object('vectors', v_vectors, 'connections', v_connections, 'version', 1);
+end;
+$$;
+
+revoke all on function public.backfill_taste_graph(uuid) from public, anon, authenticated;
+grant execute on function public.backfill_taste_graph(uuid) to service_role;
+
 create or replace function public.save_archive_analysis(
   p_work jsonb,
   p_item jsonb,

@@ -48,6 +48,24 @@ function mockSupabase(url, init = {}) {
   const body = init.body ? JSON.parse(init.body) : null;
 
   if (method === 'POST' && table === 'profiles') return response(null, 204);
+  if (method === 'POST' && table === 'backfill_taste_graph') {
+    const items = [...state.archive.values()].filter(item => item.user_id === body.p_user_id);
+    let vectors = 0;
+    for (const item of items) if (!item.taste_vector && item.analysis_json?.tags) {
+      const scores = new Map(item.analysis_json.tags.map(tag => [tag.tag, tag.score]));
+      item.taste_vector = `[${Array.from({length: 25}, (_, index) => Number(scores.get(['기억', '상실'][index]) || (index < 2 ? .8 : 0)).toFixed(4)).join(',')}]`;
+      vectors++;
+    }
+    let connections = 0;
+    for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) {
+      const exists = state.connections.some(row => row.user_id === body.p_user_id && row.from_work_id === items[i].work_id && row.to_work_id === items[j].work_id && row.connection_type === 'archive');
+      if (!exists && items[i].taste_vector && items[j].taste_vector) {
+        state.connections.push({user_id: body.p_user_id, from_work_id: items[i].work_id, to_work_id: items[j].work_id, connection_type: 'archive', reason: '복원된 연결', score: cosine(vector(items[i].taste_vector), vector(items[j].taste_vector)), shared_tags: [], work_json: items[j].work_json});
+        connections++;
+      }
+    }
+    return response({vectors, connections, version: 1});
+  }
   if (method === 'POST' && table === 'save_archive_analysis') {
     const {p_work: work, p_item: item, p_tags: tags} = body;
     if (!state.works.has(work.id)) state.works.set(work.id, work);
@@ -298,6 +316,23 @@ test('Taste DNA is stored as a 25-dimensional vector and similarities are return
   assert.equal(data.dimensions, 25);
   assert.equal(data.edges.length, 1);
   assert.ok(data.edges[0].similarity > 0 && data.edges[0].similarity <= 1);
+});
+
+test('legacy archive data is backfilled idempotently when the archive opens', async () => {
+  for (const [index, title] of ['오래된 기억', '잊힌 기억'].entries()) {
+    const id = `legacy:${index}`;
+    const work = {id, title, creator: '작가', media_type: index ? 'FILM' : 'BOOK', tags: [], source: 'legacy'};
+    state.works.set(id, work);
+    state.archive.set(`${userId}:${id}`, {user_id: userId, work_id: id, work_json: work, analysis_json: {tags: [{tag: '기억', score: .8}, {tag: '상실', score: .7}]}});
+  }
+  const first = await worker.fetch(new Request('https://site.test/api/archive', {headers}), env);
+  assert.equal(first.status, 200);
+  assert.ok([...state.archive.values()].every(item => vector(item.taste_vector).length === 25));
+  assert.equal(state.connections.filter(row => row.connection_type === 'archive').length, 1);
+
+  const second = await worker.fetch(new Request('https://site.test/api/archive', {headers}), env);
+  assert.equal(second.status, 200);
+  assert.equal(state.connections.filter(row => row.connection_type === 'archive').length, 1);
 });
 
 test('live recommendations cross media and explain the shared Taste DNA', async () => {
