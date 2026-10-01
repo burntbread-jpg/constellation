@@ -66,11 +66,28 @@ create table if not exists public.taste_tags (
     references public.archive_items(user_id, work_id) on delete cascade
 );
 
+create table if not exists public.connections (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  from_work_id text not null,
+  to_work_id text not null,
+  connection_type text not null,
+  reason text not null,
+  score double precision not null,
+  shared_tags jsonb not null default '[]'::jsonb,
+  work_json jsonb not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, from_work_id, to_work_id, connection_type)
+);
+
 create index if not exists archive_items_user_created_idx
   on public.archive_items (user_id, created_at desc);
 
 create index if not exists taste_tags_user_score_idx
   on public.taste_tags (user_id, score desc);
+
+create index if not exists connections_user_source_idx
+  on public.connections (user_id, from_work_id, connection_type, score desc);
 
 create index if not exists archive_items_taste_vector_idx
   on public.archive_items using hnsw (taste_vector extensions.vector_cosine_ops);
@@ -79,16 +96,49 @@ alter table public.profiles enable row level security;
 alter table public.works enable row level security;
 alter table public.archive_items enable row level security;
 alter table public.taste_tags enable row level security;
+alter table public.connections enable row level security;
 
 revoke all on public.profiles from anon, authenticated;
 revoke all on public.works from anon, authenticated;
 revoke all on public.archive_items from anon, authenticated;
 revoke all on public.taste_tags from anon, authenticated;
+revoke all on public.connections from anon, authenticated;
 
 grant all on public.profiles to service_role;
 grant all on public.works to service_role;
 grant all on public.archive_items to service_role;
 grant all on public.taste_tags to service_role;
+grant all on public.connections to service_role;
+
+create or replace function public.save_connections(
+  p_user_id uuid,
+  p_connections jsonb
+) returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.connections (
+    user_id, from_work_id, to_work_id, connection_type,
+    reason, score, shared_tags, work_json
+  )
+  select
+    p_user_id, item->>'from_work_id', item->>'to_work_id', item->>'connection_type',
+    item->>'reason', (item->>'score')::double precision,
+    coalesce(item->'shared_tags', '[]'::jsonb), item->'work_json'
+  from jsonb_array_elements(p_connections) as item
+  on conflict (user_id, from_work_id, to_work_id, connection_type) do update set
+    reason = excluded.reason,
+    score = excluded.score,
+    shared_tags = excluded.shared_tags,
+    work_json = excluded.work_json,
+    updated_at = now();
+end;
+$$;
+
+revoke all on function public.save_connections(uuid, jsonb) from public, anon, authenticated;
+grant execute on function public.save_connections(uuid, jsonb) to service_role;
 
 create or replace function public.save_archive_analysis(
   p_work jsonb,

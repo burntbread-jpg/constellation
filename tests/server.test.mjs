@@ -19,7 +19,8 @@ const env = {
 const state = {
   works: new Map(),
   archive: new Map(),
-  tags: []
+  tags: [],
+  connections: []
 };
 
 function response(data, status = 200) {
@@ -67,6 +68,13 @@ function mockSupabase(url, init = {}) {
     }
     return response(edges.sort((a, b) => b.similarity - a.similarity).slice(0, body.p_limit || 24));
   }
+  if (method === 'POST' && table === 'save_connections') {
+    for (const item of body.p_connections) {
+      state.connections = state.connections.filter(row => !(row.user_id === body.p_user_id && row.from_work_id === item.from_work_id && row.to_work_id === item.to_work_id && row.connection_type === item.connection_type));
+      state.connections.push({...item, user_id: body.p_user_id});
+    }
+    return response(null, 204);
+  }
   if (method === 'POST' && table === 'works') {
     state.works.set(body.id, body);
     return response(null, 204);
@@ -103,6 +111,12 @@ function mockSupabase(url, init = {}) {
     const filteredUserId = parsed.searchParams.get('user_id')?.replace(/^eq\./, '');
     return response(state.tags.filter(tag => tag.user_id === filteredUserId));
   }
+  if (method === 'GET' && table === 'connections') {
+    const filteredUserId = parsed.searchParams.get('user_id')?.replace(/^eq\./, '');
+    const fromWorkId = parsed.searchParams.get('from_work_id')?.replace(/^eq\./, '');
+    const connectionType = parsed.searchParams.get('connection_type')?.replace(/^eq\./, '');
+    return response(state.connections.filter(row => row.user_id === filteredUserId && (!fromWorkId || row.from_work_id === fromWorkId) && (!connectionType || row.connection_type === connectionType)));
+  }
   return response({message: `Unhandled mock request: ${method} ${table}`}, 500);
 }
 
@@ -124,6 +138,7 @@ test.beforeEach(() => {
   state.works.clear();
   state.archive.clear();
   state.tags = [];
+  state.connections = [];
 });
 
 test.after(() => {
@@ -296,10 +311,25 @@ test('live recommendations cross media and explain the shared Taste DNA', async 
   }), env);
   assert.equal(result.status, 200);
   const data = await result.json();
-  assert.equal(data.engine, 'taste-vector-cross-media-v1');
+  assert.equal(data.engine, 'persistent-connection-graph-v1');
   assert.ok(data.items.length >= 1);
   assert.ok(data.items.some(item => item.mediaType !== 'BOOK'));
   assert.ok(data.items.every(item => item.reason && item.similarity > 0));
+  assert.ok(data.items.every(item => item.persisted));
+  assert.equal(state.connections.length, data.items.length);
+
+  const cached = await worker.fetch(new Request('https://site.test/api/recommendations', {
+    method: 'POST',
+    headers: {...headers, 'content-type': 'application/json'},
+    body: JSON.stringify({work: {id: 'book:source', title: '기억을 걷는 사람', mediaType: 'BOOK'}, mode: 'deep'})
+  }), env);
+  const cachedData = await cached.json();
+  assert.equal(cachedData.cached, true);
+  assert.equal(cachedData.items.length, data.items.length);
+
+  const graph = await worker.fetch(new Request('https://site.test/api/connections', {headers}), env);
+  assert.equal(graph.status, 200);
+  assert.equal((await graph.json()).items.length, data.items.length);
 });
 
 test('recommendations require a signed-in visitor', async () => {
