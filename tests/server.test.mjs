@@ -284,3 +284,29 @@ test('Taste DNA is stored as a 25-dimensional vector and similarities are return
   assert.equal(data.edges.length, 1);
   assert.ok(data.edges[0].similarity > 0 && data.edges[0].similarity <= 1);
 });
+
+test('live recommendations cross media and explain the shared Taste DNA', async () => {
+  const result = await worker.fetch(new Request('https://site.test/api/recommendations', {
+    method: 'POST',
+    headers: {...headers, 'content-type': 'application/json'},
+    body: JSON.stringify({
+      work: {id: 'book:source', title: '기억을 걷는 사람', mediaType: 'BOOK', description: '기억과 상실, 가족과 우주'},
+      mode: 'deep'
+    })
+  }), env);
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.engine, 'taste-vector-cross-media-v1');
+  assert.ok(data.items.length >= 1);
+  assert.ok(data.items.some(item => item.mediaType !== 'BOOK'));
+  assert.ok(data.items.every(item => item.reason && item.similarity > 0));
+});
+
+test('recommendations require a signed-in visitor', async () => {
+  const result = await worker.fetch(new Request('https://site.test/api/recommendations', {
+    method: 'POST',
+    headers: {'content-type': 'application/json'},
+    body: JSON.stringify({work: {id: 'book:source', title: '기억', mediaType: 'BOOK'}})
+  }), env);
+  assert.equal(result.status, 401);
+});

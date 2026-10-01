@@ -24,4 +24,5 @@
 .archive-review strong{color:#e6bd62;font-weight:600}
 .dna-engine{display:block;margin-top:16px;color:#686d77;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
 .vector-match{margin-top:10px;color:#aeb2ff;font-size:13px;font-weight:600}
+.recommendation-loading{grid-column:1/-1;padding:2rem;text-align:center;color:#9ea3ad;border:1px dashed #353945;border-radius:16px}.rec-action{width:100%;text-align:left;color:inherit;cursor:pointer}.rec-action:hover{transform:translateY(-3px);border-color:#7379d8}.rec-action .match-score{float:right;color:#aeb3ff;font-size:.72rem;letter-spacing:.06em}.rec-action small{display:block;margin-top:1rem;color:#8d93ff;font-size:.75rem}
 @media(max-width:600px){.taste-dialog form{padding:26px 20px}.taste-dialog h2{font-size:25px}}
