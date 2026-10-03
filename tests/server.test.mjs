@@ -336,6 +336,11 @@ test('legacy archive data is backfilled idempotently when the archive opens', as
 });
 
 test('live recommendations cross media and explain the shared Taste DNA', async () => {
+  state.archive.set(`${userId}:openlibrary:/works/OL1W`, {
+    user_id: userId,
+    work_id: 'openlibrary:/works/OL1W',
+    work_json: {id: 'openlibrary:/works/OL1W', title: '기억의 책', media_type: 'BOOK'}
+  });
   const result = await worker.fetch(new Request('https://site.test/api/recommendations', {
     method: 'POST',
     headers: {...headers, 'content-type': 'application/json'},
@@ -346,9 +351,13 @@ test('live recommendations cross media and explain the shared Taste DNA', async 
   }), env);
   assert.equal(result.status, 200);
   const data = await result.json();
-  assert.equal(data.engine, 'persistent-connection-graph-v1');
+  assert.equal(data.engine, 'taste-vector-cross-media-v2');
+  assert.ok(data.diagnostics.queries.length >= 1 && data.diagnostics.queries.length <= 2);
+  assert.ok(data.diagnostics.mediaTypes.length >= 1);
   assert.ok(data.items.length >= 1);
   assert.ok(data.items.some(item => item.mediaType !== 'BOOK'));
+  assert.ok(data.items.every(item => item.id !== 'openlibrary:/works/OL1W'));
+  assert.equal(data.diagnostics.excludedSaved, 1);
   assert.ok(data.items.every(item => item.reason && item.similarity > 0));
   assert.ok(data.items.every(item => item.persisted));
   assert.equal(state.connections.length, data.items.length);
