@@ -86,10 +86,14 @@ create table if not exists public.recommendation_feedback (
   to_work_id text not null,
   connection_mode text not null,
   value smallint not null check (value in (-1, 1)),
+  shared_tags jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (user_id, from_work_id, to_work_id, connection_mode)
 );
+
+alter table public.recommendation_feedback
+  add column if not exists shared_tags jsonb not null default '[]'::jsonb;
 
 create index if not exists archive_items_user_created_idx
   on public.archive_items (user_id, created_at desc);

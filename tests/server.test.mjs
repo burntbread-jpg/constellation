@@ -147,7 +147,9 @@ function mockSupabase(url, init = {}) {
   }
   if (method === 'GET' && table === 'recommendation_feedback') {
     const value = key => parsed.searchParams.get(key)?.replace(/^eq\./, '');
-    return response([...state.feedback.values()].filter(row => row.user_id === value('user_id') && row.from_work_id === value('from_work_id') && row.connection_mode === value('connection_mode')));
+    const fromWorkId = value('from_work_id');
+    const connectionMode = value('connection_mode');
+    return response([...state.feedback.values()].filter(row => row.user_id === value('user_id') && (!fromWorkId || row.from_work_id === fromWorkId) && (!connectionMode || row.connection_mode === connectionMode)));
   }
   return response({message: `Unhandled mock request: ${method} ${table}`}, 500);
 }
@@ -366,7 +368,8 @@ test('live recommendations cross media and explain the shared Taste DNA', async 
   }), env);
   assert.equal(result.status, 200);
   const data = await result.json();
-  assert.equal(data.engine, 'taste-feedback-loop-v1');
+  assert.equal(data.engine, 'taste-feedback-personalization-v2');
+  assert.ok(data.items.every(item => typeof item.personalization === 'number'));
   assert.ok(data.diagnostics.queries.length >= 1 && data.diagnostics.queries.length <= 2);
   assert.ok(data.diagnostics.mediaTypes.length >= 1);
   assert.ok(data.items.length >= 1);
@@ -402,9 +405,10 @@ test('negative recommendation feedback is persisted and excludes the work', asyn
 
   const feedback = await worker.fetch(new Request('https://site.test/api/recommendation-feedback', {
     method: 'POST', headers: {...headers, 'content-type': 'application/json'},
-    body: JSON.stringify({fromWorkId: work.id, toWorkId: rejected.id, mode: 'deep', value: -1})
+    body: JSON.stringify({fromWorkId: work.id, toWorkId: rejected.id, mode: 'deep', value: -1, sharedTags: rejected.sharedTags})
   }), env);
   assert.equal(feedback.status, 200);
+  assert.equal((await feedback.json()).learnedTags, rejected.sharedTags.length);
   assert.equal(state.feedback.size, 1);
 
   const next = await worker.fetch(new Request('https://site.test/api/recommendations', {
@@ -413,6 +417,8 @@ test('negative recommendation feedback is persisted and excludes the work', asyn
   const nextData = await next.json();
   assert.ok(nextData.items.every(item => item.id !== rejected.id));
   assert.equal(nextData.diagnostics.feedbackSignals, 1);
+  assert.equal(nextData.diagnostics.globalFeedbackSignals, 1);
+  assert.equal(nextData.diagnostics.preferenceTags, rejected.sharedTags.length);
 });
 
 test('recommendations require a signed-in visitor', async () => {
