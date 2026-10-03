@@ -20,7 +20,8 @@ const state = {
   works: new Map(),
   archive: new Map(),
   tags: [],
-  connections: []
+  connections: [],
+  feedback: new Map()
 };
 
 function response(data, status = 200) {
@@ -93,6 +94,10 @@ function mockSupabase(url, init = {}) {
     }
     return response(null, 204);
   }
+  if (method === 'POST' && table === 'recommendation_feedback') {
+    state.feedback.set(`${body.user_id}:${body.from_work_id}:${body.to_work_id}:${body.connection_mode}`, body);
+    return response(null, 204);
+  }
   if (method === 'POST' && table === 'works') {
     state.works.set(body.id, body);
     return response(null, 204);
@@ -117,6 +122,11 @@ function mockSupabase(url, init = {}) {
     state.tags = state.tags.filter(tag => !(tag.user_id === filteredUserId && tag.work_id === workId));
     return response(null, 204);
   }
+  if (method === 'DELETE' && table === 'connections') {
+    const value = key => parsed.searchParams.get(key)?.replace(/^eq\./, '');
+    state.connections = state.connections.filter(row => !(row.user_id === value('user_id') && row.from_work_id === value('from_work_id') && row.to_work_id === value('to_work_id') && row.connection_type === value('connection_type')));
+    return response(null, 204);
+  }
   if (method === 'GET' && table === 'archive_items') {
     const filteredUserId = parsed.searchParams.get('user_id')?.replace(/^eq\./, '');
     return response([...state.archive.values()].filter(item => item.user_id === filteredUserId).map(item => ({
@@ -134,6 +144,10 @@ function mockSupabase(url, init = {}) {
     const fromWorkId = parsed.searchParams.get('from_work_id')?.replace(/^eq\./, '');
     const connectionType = parsed.searchParams.get('connection_type')?.replace(/^eq\./, '');
     return response(state.connections.filter(row => row.user_id === filteredUserId && (!fromWorkId || row.from_work_id === fromWorkId) && (!connectionType || row.connection_type === connectionType)));
+  }
+  if (method === 'GET' && table === 'recommendation_feedback') {
+    const value = key => parsed.searchParams.get(key)?.replace(/^eq\./, '');
+    return response([...state.feedback.values()].filter(row => row.user_id === value('user_id') && row.from_work_id === value('from_work_id') && row.connection_mode === value('connection_mode')));
   }
   return response({message: `Unhandled mock request: ${method} ${table}`}, 500);
 }
@@ -157,6 +171,7 @@ test.beforeEach(() => {
   state.archive.clear();
   state.tags = [];
   state.connections = [];
+  state.feedback.clear();
 });
 
 test.after(() => {
@@ -351,7 +366,7 @@ test('live recommendations cross media and explain the shared Taste DNA', async 
   }), env);
   assert.equal(result.status, 200);
   const data = await result.json();
-  assert.equal(data.engine, 'taste-vector-cross-media-v2');
+  assert.equal(data.engine, 'taste-feedback-loop-v1');
   assert.ok(data.diagnostics.queries.length >= 1 && data.diagnostics.queries.length <= 2);
   assert.ok(data.diagnostics.mediaTypes.length >= 1);
   assert.ok(data.items.length >= 1);
@@ -374,6 +389,30 @@ test('live recommendations cross media and explain the shared Taste DNA', async 
   const graph = await worker.fetch(new Request('https://site.test/api/connections', {headers}), env);
   assert.equal(graph.status, 200);
   assert.equal((await graph.json()).items.length, data.items.length);
+});
+
+test('negative recommendation feedback is persisted and excludes the work', async () => {
+  const work = {id: 'book:source', title: '기억을 걷는 사람', mediaType: 'BOOK', description: '기억과 상실, 가족과 우주'};
+  const first = await worker.fetch(new Request('https://site.test/api/recommendations', {
+    method: 'POST', headers: {...headers, 'content-type': 'application/json'}, body: JSON.stringify({work, mode: 'deep'})
+  }), env);
+  const firstData = await first.json();
+  assert.ok(firstData.items.length > 0);
+  const rejected = firstData.items[0];
+
+  const feedback = await worker.fetch(new Request('https://site.test/api/recommendation-feedback', {
+    method: 'POST', headers: {...headers, 'content-type': 'application/json'},
+    body: JSON.stringify({fromWorkId: work.id, toWorkId: rejected.id, mode: 'deep', value: -1})
+  }), env);
+  assert.equal(feedback.status, 200);
+  assert.equal(state.feedback.size, 1);
+
+  const next = await worker.fetch(new Request('https://site.test/api/recommendations', {
+    method: 'POST', headers: {...headers, 'content-type': 'application/json'}, body: JSON.stringify({work, mode: 'deep'})
+  }), env);
+  const nextData = await next.json();
+  assert.ok(nextData.items.every(item => item.id !== rejected.id));
+  assert.equal(nextData.diagnostics.feedbackSignals, 1);
 });
 
 test('recommendations require a signed-in visitor', async () => {

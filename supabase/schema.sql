@@ -80,6 +80,17 @@ create table if not exists public.connections (
   primary key (user_id, from_work_id, to_work_id, connection_type)
 );
 
+create table if not exists public.recommendation_feedback (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  from_work_id text not null,
+  to_work_id text not null,
+  connection_mode text not null,
+  value smallint not null check (value in (-1, 1)),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, from_work_id, to_work_id, connection_mode)
+);
+
 create index if not exists archive_items_user_created_idx
   on public.archive_items (user_id, created_at desc);
 
@@ -89,6 +100,9 @@ create index if not exists taste_tags_user_score_idx
 create index if not exists connections_user_source_idx
   on public.connections (user_id, from_work_id, connection_type, score desc);
 
+create index if not exists recommendation_feedback_user_source_idx
+  on public.recommendation_feedback (user_id, from_work_id, connection_mode, value);
+
 create index if not exists archive_items_taste_vector_idx
   on public.archive_items using hnsw (taste_vector extensions.vector_cosine_ops);
 
@@ -97,18 +111,21 @@ alter table public.works enable row level security;
 alter table public.archive_items enable row level security;
 alter table public.taste_tags enable row level security;
 alter table public.connections enable row level security;
+alter table public.recommendation_feedback enable row level security;
 
 revoke all on public.profiles from anon, authenticated;
 revoke all on public.works from anon, authenticated;
 revoke all on public.archive_items from anon, authenticated;
 revoke all on public.taste_tags from anon, authenticated;
 revoke all on public.connections from anon, authenticated;
+revoke all on public.recommendation_feedback from anon, authenticated;
 
 grant all on public.profiles to service_role;
 grant all on public.works to service_role;
 grant all on public.archive_items to service_role;
 grant all on public.taste_tags to service_role;
 grant all on public.connections to service_role;
+grant all on public.recommendation_feedback to service_role;
 
 create or replace function public.save_connections(
   p_user_id uuid,
