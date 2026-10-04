@@ -158,6 +158,21 @@ test.before(() => {
   globalThis.fetch = async (input, init) => {
     const url = String(input);
     if (url.startsWith(env.SUPABASE_URL)) return mockSupabase(url, init);
+    if (url.startsWith('https://api.themoviedb.org/3/search/movie')) {
+      return response({results: [{id: 496243, poster_path: '/default.jpg'}]});
+    }
+    if (url.startsWith('https://api.themoviedb.org/3/movie/496243/images')) {
+      return response({posters: [
+        {file_path: '/english.jpg', iso_639_1: 'en', height: 1500, vote_average: 9, vote_count: 100},
+        {file_path: '/korean.jpg', iso_639_1: 'ko', height: 3000, vote_average: 8, vote_count: 80}
+      ]});
+    }
+    if (url.startsWith('https://www.googleapis.com/books/v1/volumes')) {
+      return response({items: [
+        {id: 'ordinary', volumeInfo: {title: '기억의 책', authors: ['작가'], language: 'ko', publisher: '일반출판사', imageLinks: {thumbnail: 'http://books.test/ordinary.jpg'}}},
+        {id: 'literary', volumeInfo: {title: '기억의 책', authors: ['작가'], language: 'ko', publisher: '민음사', industryIdentifiers: [{type: 'ISBN_13', identifier: '9780000000001'}], imageLinks: {large: 'http://books.test/literary.jpg'}}}
+      ]});
+    }
     if (url.startsWith('https://openlibrary.org/')) {
       return response({docs: [{key: '/works/OL1W', title: '기억의 책', author_name: ['작가'], first_publish_year: 2020, subject: ['Memory'], publisher: ['문학동네', '민음사'], language: ['kor']}]});
     }
@@ -216,8 +231,29 @@ test('health reports free providers and configured persistence', async () => {
   assert.equal(data.sources.culturalContext, 'wikidata-authority-catalog-v2');
   assert.equal(data.sources.publisherEngine, 'korean-editions-v1');
   assert.equal(data.sources.editorialEngine, 'metadata-editorial-v1');
+  assert.equal(data.sources.artworkEngine, 'official-artwork-ranking-v1');
   assert.deepEqual(data.sources.awardCatalog, {literature: 10, film: 12, animation: 7});
   assert.equal(data.sources.tasteEngine, 'taste-profile-feedback-v2');
+});
+
+test('artwork chooses a high resolution Korean official film poster', async () => {
+  const result = await worker.fetch(new Request('https://site.test/api/artwork?title=%EA%B8%B0%EC%83%9D%EC%B6%A9&mediaType=FILM'), {...env, TMDB_READ_TOKEN: 'test-token'});
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.posterUrl, 'https://image.tmdb.org/t/p/original/korean.jpg');
+  assert.equal(data.source, 'TMDB');
+  assert.equal(data.kind, 'official-poster');
+  assert.equal(data.alternatives.length, 1);
+});
+
+test('artwork prefers a documented Korean literary edition for books', async () => {
+  const result = await worker.fetch(new Request('https://site.test/api/artwork?title=%EA%B8%B0%EC%96%B5%EC%9D%98%20%EC%B1%85&creator=%EC%9E%91%EA%B0%80&mediaType=BOOK'), {...env, GOOGLE_BOOKS_API_KEY: 'test-key'});
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.posterUrl, 'https://books.test/literary.jpg');
+  assert.equal(data.publisher, '민음사');
+  assert.equal(data.isbn, '9780000000001');
+  assert.match(data.note, /번역의 질/);
 });
 
 test('cultural context enriches a verified work with Wikidata awards and country', async () => {
