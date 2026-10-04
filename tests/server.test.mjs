@@ -179,18 +179,27 @@ test.before(() => {
       ]});
     }
     if (url.startsWith('https://www.googleapis.com/books/v1/volumes')) {
+      const query = new URL(url).searchParams.get('q') || '';
+      if (query === '기생수') return response({items: [
+        {id: 'parasite-16', volumeInfo: {title: '기생수 16(완결)', authors: ['Hitoshi Iwaaki'], publishedDate: '2016', language: 'ko', categories: ['Comics & Graphic Novels'], imageLinks: {large: 'http://books.test/parasite-16.jpg'}}},
+        {id: 'parasite-12', volumeInfo: {title: '기생수 12', authors: ['Hitoshi Iwaaki'], publishedDate: '2016', language: 'ko', categories: ['Comics & Graphic Novels'], imageLinks: {large: 'http://books.test/parasite-12.jpg'}}},
+        {id: 'parasite-set', volumeInfo: {title: '[세트] 기생수 (전16권/완결)', authors: ['Hitoshi Iwaaki'], publishedDate: '2016', language: 'ko', categories: ['Comics & Graphic Novels'], imageLinks: {large: 'http://books.test/parasite-set.jpg'}}},
+        {id: 'parasite-reversi', volumeInfo: {title: '기생수 리버시. 3', authors: ['Hitoshi Iwaaki'], publishedDate: '2021', language: 'ko', categories: ['Comics & Graphic Novels'], imageLinks: {large: 'http://books.test/reversi.jpg'}}}
+      ]});
       return response({items: [
         {id: 'ordinary', volumeInfo: {title: '기억의 책', authors: ['작가'], language: 'ko', publisher: '일반출판사', imageLinks: {thumbnail: 'http://books.test/ordinary.jpg'}}},
         {id: 'literary', volumeInfo: {title: '기억의 책', authors: ['작가'], language: 'ko', publisher: '민음사', industryIdentifiers: [{type: 'ISBN_13', identifier: '9780000000001'}], imageLinks: {large: 'http://books.test/literary.jpg?zoom=1'}}}
       ]});
     }
     if (url.startsWith('https://openlibrary.org/')) {
+      if ((new URL(url).searchParams.get('q') || '') === '기생수') return response({docs: []});
       return response({docs: [{key: '/works/OL1W', title: '기억의 책', author_name: ['작가'], first_publish_year: 2020, subject: ['Memory'], publisher: ['문학동네', '민음사'], language: ['kor']}]});
     }
     if (url === 'https://graphql.anilist.co') {
       const search = JSON.parse(init.body).variables.search;
       if (search === '건버스터') return response({data: {Page: {media: []}}});
       if (search === 'Top wo Nerae! Gunbuster') return response({data: {Page: {media: [{id: 949, title: {userPreferred: 'Gunbuster', native: 'トップをねらえ!'}, description: '우주와 성장', startDate: {year: 1988}, coverImage: {extraLarge: 'https://images.test/gunbuster.jpg'}, genres: ['Drama'], tags: [], staff: {nodes: []}}]}}});
+      if (search === '기생수') return response({data: {Page: {media: [{id: 20623, title: {userPreferred: '기생수', native: '寄生獣 セイの格率'}, description: '기생 생물과 인간의 공존', startDate: {year: 2014}, coverImage: {extraLarge: 'https://images.test/parasyte-anime.jpg'}, genres: ['Action', 'Horror'], tags: [], staff: {nodes: []}}]}}});
       return response({data: {Page: {media: [{id: 1, title: {userPreferred: '별의 아이', native: '星の子'}, description: '우주와 가족', startDate: {year: 2021}, coverImage: {}, genres: ['Drama'], tags: [], staff: {nodes: []}}]}}});
     }
     if (url.startsWith('https://www.wikidata.org/w/api.php')) {
@@ -346,6 +355,16 @@ test('search combines free Open Library and AniList results without paid keys', 
   assert.equal(data.sources.TMDB, 'needs_key');
   assert.equal(data.sources['Google Books'], 'needs_key');
   assert.deepEqual(data.items.map(item => item.source).sort(), ['AniList', 'Open Library']);
+});
+
+test('search groups manga volumes and sets while keeping the anime adaptation separate', async () => {
+  const result = await worker.fetch(new Request('https://site.test/api/search?q=기생수'), {...env, GOOGLE_BOOKS_API_KEY: 'test-key'});
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.deepEqual(data.items.map(item => [item.title, item.mediaType]), [['기생수', 'MANGA'], ['기생수', 'ANIME']]);
+  const manga = data.items[0];
+  assert.equal(manga.editionCount, 3);
+  assert.equal(data.items.some(item => item.title.includes('리버시')), false);
 });
 
 test('archive lifecycle creates Taste DNA, aggregates it, and deletes it', async () => {
