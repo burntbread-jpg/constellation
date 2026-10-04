@@ -21,7 +21,8 @@ const state = {
   archive: new Map(),
   tags: [],
   connections: [],
-  feedback: new Map()
+  feedback: new Map(),
+  profileWrites: 0
 };
 
 function response(data, status = 200) {
@@ -48,7 +49,11 @@ function mockSupabase(url, init = {}) {
   const method = init.method || 'GET';
   const body = init.body ? JSON.parse(init.body) : null;
 
-  if (method === 'POST' && table === 'profiles') return response(null, 204);
+  if (method === 'POST' && table === 'profiles') {
+    state.profileWrites++;
+    assert.match(body.id, /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    return response(null, 204);
+  }
   if (method === 'POST' && table === 'backfill_taste_graph') {
     const items = [...state.archive.values()].filter(item => item.user_id === body.p_user_id);
     let vectors = 0;
@@ -217,6 +222,7 @@ test.beforeEach(() => {
   state.tags = [];
   state.connections = [];
   state.feedback.clear();
+  state.profileWrites = 0;
 });
 
 test.after(() => {
@@ -399,6 +405,34 @@ test('archive endpoints reject unauthenticated requests', async () => {
   assert.equal(result.status, 401);
 });
 
+test('external Sites user IDs map to a stable UUID and archive GET stays read-only', async () => {
+  const externalHeaders = {
+    'oai-authenticated-user-id': 'appgprj_example~external_visitor_123',
+    'oai-authenticated-user-email': 'external@example.com',
+    'content-type': 'application/json'
+  };
+  const empty = await worker.fetch(new Request('https://site.test/api/archive', {headers: externalHeaders}), env);
+  assert.equal(empty.status, 200);
+  assert.equal(state.profileWrites, 0);
+
+  const save = await worker.fetch(new Request('https://site.test/api/archive', {
+    method: 'POST',
+    headers: externalHeaders,
+    body: JSON.stringify({work: {id: 'anilist:30', externalId: '30', title: '신세기 에반게리온', creator: '안노 히데아키', year: 1995, mediaType: 'ANIME'}, rating: 5, myComment: '정체성과 고독'})
+  }), env);
+  assert.equal(save.status, 201);
+  assert.equal(state.profileWrites, 1);
+  const savedUserId = [...state.archive.values()][0].user_id;
+  assert.match(savedUserId, /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+
+  const archive = await worker.fetch(new Request('https://site.test/api/archive', {headers: externalHeaders}), env);
+  const data = await archive.json();
+  assert.equal(archive.status, 200);
+  assert.equal(data.items.length, 1);
+  assert.equal(data.items[0].title, '신세기 에반게리온');
+  assert.equal(state.profileWrites, 1);
+});
+
 test('hostile media types are normalized and cannot trap Taste DNA generation', async () => {
   const result = await worker.fetch(new Request('https://site.test/api/archive', {
     method: 'POST',
@@ -484,7 +518,7 @@ test('Taste DNA is stored as a 25-dimensional vector and similarities are return
   assert.ok(data.edges[0].similarity > 0 && data.edges[0].similarity <= 1);
 });
 
-test('legacy archive data is backfilled idempotently when the archive opens', async () => {
+test('archive GET remains read-only and returns legacy work_json without backfill', async () => {
   for (const [index, title] of ['오래된 기억', '잊힌 기억'].entries()) {
     const id = `legacy:${index}`;
     const work = {id, title, creator: '작가', media_type: index ? 'FILM' : 'BOOK', tags: [], source: 'legacy'};
@@ -493,12 +527,15 @@ test('legacy archive data is backfilled idempotently when the archive opens', as
   }
   const first = await worker.fetch(new Request('https://site.test/api/archive', {headers}), env);
   assert.equal(first.status, 200);
-  assert.ok([...state.archive.values()].every(item => vector(item.taste_vector).length === 25));
-  assert.equal(state.connections.filter(row => row.connection_type === 'archive').length, 1);
+  assert.equal((await first.json()).items.length, 2);
+  assert.ok([...state.archive.values()].every(item => !item.taste_vector));
+  assert.equal(state.connections.length, 0);
+  assert.equal(state.profileWrites, 0);
 
   const second = await worker.fetch(new Request('https://site.test/api/archive', {headers}), env);
   assert.equal(second.status, 200);
-  assert.equal(state.connections.filter(row => row.connection_type === 'archive').length, 1);
+  assert.equal(state.connections.length, 0);
+  assert.equal(state.profileWrites, 0);
 });
 
 test('live recommendations cross media and explain the shared Taste DNA', async () => {
