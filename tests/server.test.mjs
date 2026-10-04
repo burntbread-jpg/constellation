@@ -215,6 +215,7 @@ test('health reports free providers and configured persistence', async () => {
   assert.equal(data.sources.wikidata, true);
   assert.equal(data.sources.culturalContext, 'wikidata-authority-catalog-v2');
   assert.equal(data.sources.publisherEngine, 'korean-editions-v1');
+  assert.equal(data.sources.editorialEngine, 'metadata-editorial-v1');
   assert.deepEqual(data.sources.awardCatalog, {literature: 10, film: 12, animation: 7});
   assert.equal(data.sources.tasteEngine, 'taste-profile-feedback-v2');
 });
@@ -244,6 +245,22 @@ test('book publishers returns deduplicated Korean edition publishers', async () 
     {name: '민음사', sources: ['Open Library']}
   ]);
   assert.equal(data.language, 'ko');
+});
+
+test('editorial intro compresses a work into conflict, motif, and escalation', async () => {
+  const result = await worker.fetch(new Request('https://site.test/api/editorial-intro', {
+    method: 'POST',
+    headers: {'content-type': 'application/json'},
+    body: JSON.stringify({work: {
+      id: 'book:memory', title: '기억의 책', creator: '작가', mediaType: 'BOOK',
+      description: '잃어버린 기억과 가족의 상실을 따라가는 소설', tags: ['기억', '상실']
+    }})
+  }), env);
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.text, '잃어버린 것을 붙잡으려는 마음을 기억이 스스로를 배반하는 순간까지 밀어붙인 작품.');
+  assert.equal(data.engine, 'metadata-editorial-v1');
+  assert.equal(data.cost, 'free');
 });
 
 test('cultural context rejects an ambiguous Wikidata candidate', async () => {
