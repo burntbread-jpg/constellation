@@ -186,13 +186,19 @@ test.before(() => {
         {id: 'parasite-set', volumeInfo: {title: '[세트] 기생수 (전16권/완결)', authors: ['Hitoshi Iwaaki'], publishedDate: '2016', language: 'ko', categories: ['Comics & Graphic Novels'], imageLinks: {large: 'http://books.test/parasite-set.jpg'}}},
         {id: 'parasite-reversi', volumeInfo: {title: '기생수 리버시. 3', authors: ['Hitoshi Iwaaki'], publishedDate: '2021', language: 'ko', categories: ['Comics & Graphic Novels'], imageLinks: {large: 'http://books.test/reversi.jpg'}}}
       ]});
+      if (query === '강철의 연금술사') return response({items: [
+        {id: 'fma-base', volumeInfo: {title: '강철의 연금술사 1', authors: ['Hiromu Arakawa'], publishedDate: '2005', language: 'ko', categories: ['Comics & Graphic Novels'], imageLinks: {large: 'http://books.test/fma-1.jpg'}}},
+        {id: 'fma-perfect', volumeInfo: {title: '강철의 연금술사. 11(완전판)', authors: ['Hiromu Arakawa'], publishedDate: '2013', language: 'ko', categories: ['Comics & Graphic Novels'], imageLinks: {large: 'http://books.test/fma-perfect.jpg'}}},
+        {id: 'fma-limited', volumeInfo: {title: '강철의 연금술사. 13(초회한정특별판)', authors: ['Hiromu Arakawa'], publishedDate: '2006', language: 'ko', categories: ['Comics & Graphic Novels'], imageLinks: {large: 'http://books.test/fma-limited.jpg'}}},
+        {id: 'fma-omake', volumeInfo: {title: '강철의 연금술사 4컷만화', authors: ['Hiromu Arakawa'], publishedDate: '2019', language: 'ko', categories: ['Comics & Graphic Novels'], imageLinks: {large: 'http://books.test/fma-omake.jpg'}}}
+      ]});
       return response({items: [
         {id: 'ordinary', volumeInfo: {title: '기억의 책', authors: ['작가'], language: 'ko', publisher: '일반출판사', imageLinks: {thumbnail: 'http://books.test/ordinary.jpg'}}},
         {id: 'literary', volumeInfo: {title: '기억의 책', authors: ['작가'], language: 'ko', publisher: '민음사', industryIdentifiers: [{type: 'ISBN_13', identifier: '9780000000001'}], imageLinks: {large: 'http://books.test/literary.jpg?zoom=1'}}}
       ]});
     }
     if (url.startsWith('https://openlibrary.org/')) {
-      if ((new URL(url).searchParams.get('q') || '') === '기생수') return response({docs: []});
+      if (['기생수', '강철의 연금술사'].includes(new URL(url).searchParams.get('q') || '')) return response({docs: []});
       return response({docs: [{key: '/works/OL1W', title: '기억의 책', author_name: ['작가'], first_publish_year: 2020, subject: ['Memory'], publisher: ['문학동네', '민음사'], language: ['kor']}]});
     }
     if (url === 'https://graphql.anilist.co') {
@@ -200,6 +206,7 @@ test.before(() => {
       if (search === '건버스터') return response({data: {Page: {media: []}}});
       if (search === 'Top wo Nerae! Gunbuster') return response({data: {Page: {media: [{id: 949, title: {userPreferred: 'Gunbuster', native: 'トップをねらえ!'}, description: '우주와 성장', startDate: {year: 1988}, coverImage: {extraLarge: 'https://images.test/gunbuster.jpg'}, genres: ['Drama'], tags: [], staff: {nodes: []}}]}}});
       if (search === '기생수') return response({data: {Page: {media: [{id: 20623, title: {userPreferred: '기생수', native: '寄生獣 セイの格率'}, description: '기생 생물과 인간의 공존', startDate: {year: 2014}, coverImage: {extraLarge: 'https://images.test/parasyte-anime.jpg'}, genres: ['Action', 'Horror'], tags: [], staff: {nodes: []}}]}}});
+      if (search === '강철의 연금술사') return response({data: {Page: {media: [{id: 121, title: {userPreferred: '강철의 연금술사', native: '鋼の錬金術師'}, description: '두 형제의 연금술 여정', startDate: {year: 2003}, coverImage: {extraLarge: 'https://images.test/fma-anime.jpg'}, genres: ['Action', 'Adventure'], tags: [], staff: {nodes: []}}]}}});
       return response({data: {Page: {media: [{id: 1, title: {userPreferred: '별의 아이', native: '星の子'}, description: '우주와 가족', startDate: {year: 2021}, coverImage: {}, genres: ['Drama'], tags: [], staff: {nodes: []}}]}}});
     }
     if (url.startsWith('https://www.wikidata.org/w/api.php')) {
@@ -365,6 +372,15 @@ test('search groups manga volumes and sets while keeping the anime adaptation se
   const manga = data.items[0];
   assert.equal(manga.editionCount, 3);
   assert.equal(data.items.some(item => item.title.includes('리버시')), false);
+});
+
+test('search groups complete and limited manga editions without title-specific rules', async () => {
+  const result = await worker.fetch(new Request('https://site.test/api/search?q=강철의%20연금술사'), {...env, GOOGLE_BOOKS_API_KEY: 'test-key'});
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.deepEqual(data.items.map(item => [item.title, item.mediaType]), [['강철의 연금술사', 'MANGA'], ['강철의 연금술사', 'ANIME']]);
+  assert.equal(data.items[0].editionCount, 3);
+  assert.equal(data.items.some(item => item.title.includes('4컷')), false);
 });
 
 test('archive lifecycle creates Taste DNA, aggregates it, and deletes it', async () => {
