@@ -1,5 +1,5 @@
 const works={
- evangelion:{title:'신세기 에반게리온',creator:'안노 히데아키',type:'ANIME',year:'1995',award:'🏆 Seiun',quote:'“고슴도치의 딜레마를 세계의 종말까지 밀어붙인 작품.”',tags:['고독','자아정체성','부모와 자식','종말'],score:94,poster:'poster-eva',posterText:'NEON<br>GENESIS<br><b>EVANGELION</b>'},
+ evangelion:{externalId:'30',title:'신세기 에반게리온',creator:'안노 히데아키',type:'ANIME',year:'1995',award:'🏆 Seiun',quote:'“고슴도치의 딜레마를 세계의 종말까지 밀어붙인 작품.”',tags:['고독','자아정체성','부모와 자식','종말'],score:94,posterUrl:'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx30-AI1zr74Dh4ye.jpg',artwork:{source:'AniList',kind:'official-cover',selection:'공식 고해상도 대표 커버'},poster:'poster-eva',posterText:'NEON<br>GENESIS<br><b>EVANGELION</b>'},
  parasite:{externalId:'496243',title:'기생충',creator:'봉준호',type:'FILM',year:'2019',award:'🏆 Cannes · Oscar',quote:'“위로 올라가고 싶은 욕망을 한 채의 집으로 압축한 비극.”',tags:['계급','공간','상승 욕망','침입'],score:91,poster:'poster-parasite',posterText:'PARA<br><b>SITE</b>'},
  her:{externalId:'152601',title:'Her',creator:'스파이크 존즈',type:'FILM',year:'2013',award:'🏆 Academy',quote:'“가장 가까운 존재가 몸이 없을 때, 사랑은 무엇으로 남는가.”',tags:['외로움','인간과 비인간','친밀감','상실'],score:88,poster:'poster-her',posterText:'A SPIKE JONZE<br><b>HER</b>'}
 };
