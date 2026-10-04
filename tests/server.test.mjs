@@ -188,7 +188,7 @@ test('health reports free providers and configured persistence', async () => {
   assert.equal(data.sources.openLibrary, true);
   assert.equal(data.sources.aniList, true);
   assert.equal(data.sources.supabase, true);
-  assert.equal(data.sources.tasteEngine, 'metadata-lexicon-v1');
+  assert.equal(data.sources.tasteEngine, 'taste-profile-feedback-v2');
 });
 
 test('search combines free Open Library and AniList results without paid keys', async () => {
@@ -419,6 +419,17 @@ test('negative recommendation feedback is persisted and excludes the work', asyn
   assert.equal(nextData.diagnostics.feedbackSignals, 1);
   assert.equal(nextData.diagnostics.globalFeedbackSignals, 1);
   assert.equal(nextData.diagnostics.preferenceTags, rejected.sharedTags.length);
+});
+
+test('Taste profile exposes preference signals learned from recommendation feedback', async () => {
+  state.feedback.set('positive', {user_id: userId, from_work_id: 'a', to_work_id: 'b', connection_mode: 'deep', value: 1, shared_tags: ['기억', '고독']});
+  state.feedback.set('negative', {user_id: userId, from_work_id: 'a', to_work_id: 'c', connection_mode: 'deep', value: -1, shared_tags: ['폭력']});
+  const result = await worker.fetch(new Request('https://site.test/api/taste-profile', {headers}), env);
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.engine, 'taste-profile-feedback-v2');
+  assert.equal(data.feedbackCount, 2);
+  assert.deepEqual(data.learnedTags.map(item => [item.tag, item.sentiment]), [['기억', 'more'], ['고독', 'more'], ['폭력', 'less']]);
 });
 
 test('recommendations require a signed-in visitor', async () => {
