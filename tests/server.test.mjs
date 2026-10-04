@@ -164,6 +164,30 @@ test.before(() => {
     if (url === 'https://graphql.anilist.co') {
       return response({data: {Page: {media: [{id: 1, title: {userPreferred: '별의 아이', native: '星の子'}, description: '우주와 가족', startDate: {year: 2021}, coverImage: {}, genres: ['Drama'], tags: [], staff: {nodes: []}}]}}});
     }
+    if (url.startsWith('https://www.wikidata.org/w/api.php')) {
+      const request = new URL(url);
+      if (request.searchParams.get('action') === 'wbsearchentities') {
+        const id = request.searchParams.get('search') === '다른 책' ? 'Q999' : 'Q100';
+        return response({search: [{id}]});
+      }
+      const ids = request.searchParams.get('ids') || '';
+      if (ids.includes('Q200') || ids.includes('Q300')) return response({entities: {
+        Q200: {labels: {ko: {value: '부커상'}}},
+        Q300: {labels: {ko: {value: '대한민국'}}}
+      }});
+      if (ids === 'Q999') return response({entities: {Q999: {
+        id: 'Q999', labels: {ko: {value: '전혀 다른 작품'}}, descriptions: {ko: {value: '1990년 영화'}}, claims: {
+          P577: [{rank: 'normal', mainsnak: {datavalue: {value: {time: '+1990-01-01T00:00:00Z'}}}}]
+        }
+      }}});
+      return response({entities: {Q100: {
+        id: 'Q100', labels: {ko: {value: '기억의 책'}, en: {value: 'The Book of Memory'}}, aliases: {en: [{value: 'Book of Memory'}]}, descriptions: {ko: {value: '2020년 소설'}}, claims: {
+          P166: [{rank: 'normal', mainsnak: {datavalue: {value: {id: 'Q200'}}}}],
+          P495: [{rank: 'normal', mainsnak: {datavalue: {value: {id: 'Q300'}}}}],
+          P577: [{rank: 'normal', mainsnak: {datavalue: {value: {time: '+2020-01-01T00:00:00Z'}}}}]
+        }
+      }}});
+    }
     throw new Error(`Unexpected external request: ${url}`);
   };
 });
@@ -188,7 +212,30 @@ test('health reports free providers and configured persistence', async () => {
   assert.equal(data.sources.openLibrary, true);
   assert.equal(data.sources.aniList, true);
   assert.equal(data.sources.supabase, true);
+  assert.equal(data.sources.wikidata, true);
+  assert.equal(data.sources.culturalContext, 'wikidata-structured-v1');
   assert.equal(data.sources.tasteEngine, 'taste-profile-feedback-v2');
+});
+
+test('cultural context enriches a verified work with Wikidata awards and country', async () => {
+  const result = await worker.fetch(new Request('https://site.test/api/cultural-context?title=%EA%B8%B0%EC%96%B5%EC%9D%98%20%EC%B1%85&year=2020&mediaType=BOOK'), env);
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.matched, true);
+  assert.equal(data.entityId, 'Q100');
+  assert.equal(data.confidence, 1);
+  assert.deepEqual(data.awards, [{id: 'Q200', label: '부커상'}]);
+  assert.deepEqual(data.countries, [{id: 'Q300', label: '대한민국'}]);
+  assert.equal(data.properties.awards, 'P166');
+  assert.equal(data.properties.countries, 'P495');
+});
+
+test('cultural context rejects an ambiguous Wikidata candidate', async () => {
+  const result = await worker.fetch(new Request('https://site.test/api/cultural-context?title=%EB%8B%A4%EB%A5%B8%20%EC%B1%85&year=2020&mediaType=BOOK'), env);
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.matched, false);
+  assert.equal(data.source, 'Wikidata');
 });
 
 test('search combines free Open Library and AniList results without paid keys', async () => {
