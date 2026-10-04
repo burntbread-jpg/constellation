@@ -124,7 +124,11 @@ function mockSupabase(url, init = {}) {
   }
   if (method === 'DELETE' && table === 'connections') {
     const value = key => parsed.searchParams.get(key)?.replace(/^eq\./, '');
-    state.connections = state.connections.filter(row => !(row.user_id === value('user_id') && row.from_work_id === value('from_work_id') && row.to_work_id === value('to_work_id') && row.connection_type === value('connection_type')));
+    const user = value('user_id');
+    const from = value('from_work_id');
+    const to = value('to_work_id');
+    const type = value('connection_type');
+    state.connections = state.connections.filter(row => !(row.user_id === user && (!from || row.from_work_id === from) && (!to || row.to_work_id === to) && (!type || row.connection_type === type)));
     return response(null, 204);
   }
   if (method === 'GET' && table === 'archive_items') {
@@ -352,6 +356,12 @@ test('archive lifecycle creates Taste DNA, aggregates it, and deletes it', async
   assert.ok(profileData.tags.length >= 1);
   assert.match(profileData.statement, /당신/);
 
+  state.connections.push(
+    {user_id: userId, from_work_id: work.id, to_work_id: 'other:1', connection_type: 'archive', reason: 'outgoing', score: .8, shared_tags: [], work_json: {id: 'other:1', title: '다른 작품'}},
+    {user_id: userId, from_work_id: 'other:2', to_work_id: work.id, connection_type: 'archive', reason: 'incoming', score: .7, shared_tags: [], work_json: state.works.get(work.id)},
+    {user_id: userId, from_work_id: 'other:1', to_work_id: 'other:2', connection_type: 'archive', reason: 'unrelated', score: .6, shared_tags: [], work_json: {id: 'other:2', title: '남은 작품'}}
+  );
+
   const remove = await worker.fetch(new Request(`https://site.test/api/archive/${encodeURIComponent(work.id)}`, {
     method: 'DELETE',
     headers
@@ -359,6 +369,29 @@ test('archive lifecycle creates Taste DNA, aggregates it, and deletes it', async
   assert.equal(remove.status, 200);
   assert.equal(state.archive.size, 0);
   assert.equal(state.tags.length, 0);
+  assert.equal(state.connections.length, 1);
+  assert.equal(state.connections[0].reason, 'unrelated');
+});
+
+test('connection graph normalizes archived snake_case work metadata', async () => {
+  state.connections.push({
+    user_id: userId,
+    from_work_id: 'book:source',
+    to_work_id: 'anime:target',
+    connection_type: 'archive',
+    reason: 'Taste DNA 연결',
+    score: .91,
+    shared_tags: ['기억'],
+    work_json: {id: 'anime:target', external_id: '300', title: '대상 작품', original_title: 'Target', creator: '감독', release_year: 1995, media_type: 'ANIME', poster_url: 'https://images.test/poster.jpg', description: '설명', tags: ['기억'], source: 'AniList'}
+  });
+  const result = await worker.fetch(new Request('https://site.test/api/connections', {headers}), env);
+  assert.equal(result.status, 200);
+  const item = (await result.json()).items[0];
+  assert.equal(item.mediaType, 'ANIME');
+  assert.equal(item.year, 1995);
+  assert.equal(item.externalId, '300');
+  assert.equal(item.posterUrl, 'https://images.test/poster.jpg');
+  assert.equal(item.fromWorkId, 'book:source');
 });
 
 test('archive endpoints reject unauthenticated requests', async () => {
