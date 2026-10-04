@@ -168,6 +168,8 @@ test.before(() => {
     const url = String(input);
     if (url.startsWith(env.SUPABASE_URL)) return mockSupabase(url, init);
     if (url.startsWith('https://api.themoviedb.org/3/search/movie')) {
+      const query = new URL(url).searchParams.get('query');
+      if (query === '멜랑콜리아') return response({results: []});
       return response({results: [{id: 496243, poster_path: '/default.jpg'}]});
     }
     if (url.startsWith('https://api.themoviedb.org/3/movie/496243/images')) {
@@ -179,13 +181,16 @@ test.before(() => {
     if (url.startsWith('https://www.googleapis.com/books/v1/volumes')) {
       return response({items: [
         {id: 'ordinary', volumeInfo: {title: '기억의 책', authors: ['작가'], language: 'ko', publisher: '일반출판사', imageLinks: {thumbnail: 'http://books.test/ordinary.jpg'}}},
-        {id: 'literary', volumeInfo: {title: '기억의 책', authors: ['작가'], language: 'ko', publisher: '민음사', industryIdentifiers: [{type: 'ISBN_13', identifier: '9780000000001'}], imageLinks: {large: 'http://books.test/literary.jpg'}}}
+        {id: 'literary', volumeInfo: {title: '기억의 책', authors: ['작가'], language: 'ko', publisher: '민음사', industryIdentifiers: [{type: 'ISBN_13', identifier: '9780000000001'}], imageLinks: {large: 'http://books.test/literary.jpg?zoom=1'}}}
       ]});
     }
     if (url.startsWith('https://openlibrary.org/')) {
       return response({docs: [{key: '/works/OL1W', title: '기억의 책', author_name: ['작가'], first_publish_year: 2020, subject: ['Memory'], publisher: ['문학동네', '민음사'], language: ['kor']}]});
     }
     if (url === 'https://graphql.anilist.co') {
+      const search = JSON.parse(init.body).variables.search;
+      if (search === '건버스터') return response({data: {Page: {media: []}}});
+      if (search === 'Top wo Nerae! Gunbuster') return response({data: {Page: {media: [{id: 949, title: {userPreferred: 'Gunbuster', native: 'トップをねらえ!'}, description: '우주와 성장', startDate: {year: 1988}, coverImage: {extraLarge: 'https://images.test/gunbuster.jpg'}, genres: ['Drama'], tags: [], staff: {nodes: []}}]}}});
       return response({data: {Page: {media: [{id: 1, title: {userPreferred: '별의 아이', native: '星の子'}, description: '우주와 가족', startDate: {year: 2021}, coverImage: {}, genres: ['Drama'], tags: [], staff: {nodes: []}}]}}});
     }
     if (url.startsWith('https://www.wikidata.org/w/api.php')) {
@@ -256,14 +261,29 @@ test('artwork chooses a high resolution Korean official film poster', async () =
   assert.equal(data.alternatives.length, 1);
 });
 
+test('film artwork prefers an original title for provider matching', async () => {
+  const result = await worker.fetch(new Request('https://site.test/api/artwork?title=%EB%A9%9C%EB%9E%91%EC%BD%9C%EB%A6%AC%EC%95%84&originalTitle=Melancholia&mediaType=FILM'), {...env, TMDB_READ_TOKEN: 'test-token'});
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.posterUrl, 'https://image.tmdb.org/t/p/original/korean.jpg');
+});
+
 test('artwork prefers a documented Korean literary edition for books', async () => {
   const result = await worker.fetch(new Request('https://site.test/api/artwork?title=%EA%B8%B0%EC%96%B5%EC%9D%98%20%EC%B1%85&creator=%EC%9E%91%EA%B0%80&mediaType=BOOK'), {...env, GOOGLE_BOOKS_API_KEY: 'test-key'});
   assert.equal(result.status, 200);
   const data = await result.json();
-  assert.equal(data.posterUrl, 'https://books.test/literary.jpg');
+  assert.equal(data.posterUrl, 'https://books.test/literary.jpg?zoom=1');
   assert.equal(data.publisher, '민음사');
   assert.equal(data.isbn, '9780000000001');
   assert.match(data.note, /번역의 질/);
+});
+
+test('anime artwork uses the original title when the Korean title is not indexed', async () => {
+  const result = await worker.fetch(new Request("https://site.test/api/artwork?title=%EA%B1%B4%EB%B2%84%EC%8A%A4%ED%84%B0&originalTitle=Top%20wo%20Nerae%21%20Gunbuster&mediaType=ANIME"), env);
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.posterUrl, 'https://images.test/gunbuster.jpg');
+  assert.equal(data.source, 'AniList');
 });
 
 test('cultural context enriches a verified work with Wikidata awards and country', async () => {
