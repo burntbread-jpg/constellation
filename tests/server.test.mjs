@@ -159,7 +159,7 @@ test.before(() => {
     const url = String(input);
     if (url.startsWith(env.SUPABASE_URL)) return mockSupabase(url, init);
     if (url.startsWith('https://openlibrary.org/')) {
-      return response({docs: [{key: '/works/OL1W', title: '기억의 책', author_name: ['작가'], first_publish_year: 2020, subject: ['Memory']}]});
+      return response({docs: [{key: '/works/OL1W', title: '기억의 책', author_name: ['작가'], first_publish_year: 2020, subject: ['Memory'], publisher: ['문학동네', '민음사'], language: ['kor']}]});
     }
     if (url === 'https://graphql.anilist.co') {
       return response({data: {Page: {media: [{id: 1, title: {userPreferred: '별의 아이', native: '星の子'}, description: '우주와 가족', startDate: {year: 2021}, coverImage: {}, genres: ['Drama'], tags: [], staff: {nodes: []}}]}}});
@@ -182,7 +182,7 @@ test.before(() => {
       }}});
       return response({entities: {Q100: {
         id: 'Q100', labels: {ko: {value: '기억의 책'}, en: {value: 'The Book of Memory'}}, aliases: {en: [{value: 'Book of Memory'}]}, descriptions: {ko: {value: '2020년 소설'}}, claims: {
-          P166: [{rank: 'normal', mainsnak: {datavalue: {value: {id: 'Q200'}}}}],
+          P166: [{rank: 'normal', mainsnak: {datavalue: {value: {id: 'Q200'}}}}, {rank: 'normal', mainsnak: {datavalue: {value: {id: 'Q201'}}}}],
           P495: [{rank: 'normal', mainsnak: {datavalue: {value: {id: 'Q300'}}}}],
           P577: [{rank: 'normal', mainsnak: {datavalue: {value: {time: '+2020-01-01T00:00:00Z'}}}}]
         }
@@ -213,7 +213,9 @@ test('health reports free providers and configured persistence', async () => {
   assert.equal(data.sources.aniList, true);
   assert.equal(data.sources.supabase, true);
   assert.equal(data.sources.wikidata, true);
-  assert.equal(data.sources.culturalContext, 'wikidata-structured-v1');
+  assert.equal(data.sources.culturalContext, 'wikidata-authority-catalog-v2');
+  assert.equal(data.sources.publisherEngine, 'korean-editions-v1');
+  assert.deepEqual(data.sources.awardCatalog, {literature: 10, film: 12, animation: 7});
   assert.equal(data.sources.tasteEngine, 'taste-profile-feedback-v2');
 });
 
@@ -224,10 +226,24 @@ test('cultural context enriches a verified work with Wikidata awards and country
   assert.equal(data.matched, true);
   assert.equal(data.entityId, 'Q100');
   assert.equal(data.confidence, 1);
-  assert.deepEqual(data.awards, [{id: 'Q200', label: '부커상'}]);
+  assert.deepEqual(data.awards, [{id: 'Q200', label: '부커상', canonical: 'Booker Prize', tier: 'top'}]);
+  assert.equal(data.excludedAwardCount, 1);
+  assert.equal(data.catalogVersion, 2);
   assert.deepEqual(data.countries, [{id: 'Q300', label: '대한민국'}]);
   assert.equal(data.properties.awards, 'P166');
   assert.equal(data.properties.countries, 'P495');
+  assert.deepEqual(data.awardCatalog, {literature: 10, film: 12, animation: 7});
+});
+
+test('book publishers returns deduplicated Korean edition publishers', async () => {
+  const result = await worker.fetch(new Request('https://site.test/api/book-publishers?title=%EA%B8%B0%EC%96%B5%EC%9D%98%20%EC%B1%85&creator=%EC%9E%91%EA%B0%80'), env);
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.deepEqual(data.publishers, [
+    {name: '문학동네', sources: ['Open Library']},
+    {name: '민음사', sources: ['Open Library']}
+  ]);
+  assert.equal(data.language, 'ko');
 });
 
 test('cultural context rejects an ambiguous Wikidata candidate', async () => {
