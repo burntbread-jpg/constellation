@@ -147,6 +147,13 @@ function mockSupabase(url, init = {}) {
     state.archive.set(`${body.user_id}:${body.work_id}`, body);
     return response(null, 204);
   }
+  if (method === 'PATCH' && table === 'archive_items') {
+    const value = key => parsed.searchParams.get(key)?.replace(/^eq\./, '');
+    const key = `${value('user_id')}:${value('work_id')}`;
+    const item = state.archive.get(key);
+    if (item) state.archive.set(key, {...item, ...body});
+    return response(null, 204);
+  }
   if (method === 'POST' && table === 'taste_tags') {
     state.tags.push(...body);
     return response(null, 204);
@@ -174,7 +181,8 @@ function mockSupabase(url, init = {}) {
   }
   if (method === 'GET' && table === 'archive_items') {
     const filteredUserId = parsed.searchParams.get('user_id')?.replace(/^eq\./, '');
-    return response([...state.archive.values()].filter(item => item.user_id === filteredUserId).map(item => ({
+    const filteredWorkId = parsed.searchParams.get('work_id')?.replace(/^eq\./, '');
+    return response([...state.archive.values()].filter(item => item.user_id === filteredUserId && (!filteredWorkId || item.work_id === filteredWorkId)).map(item => ({
       ...item,
       created_at: '2026-09-30T00:00:00.000Z',
       works: state.works.get(item.work_id)
@@ -318,6 +326,7 @@ test('health reports free providers and configured persistence', async () => {
   assert.deepEqual(data.sources.awardCatalog, {literature: 10, film: 12, animation: 7});
   assert.equal(data.sources.tasteEngine, 'taste-profile-feedback-v2');
   assert.equal(data.sources.recommendationEngine, 'pgvector-catalog-feedback-v1');
+  assert.equal(data.sources.archiveEngine, 'archive-management-v1');
   assert.equal(data.sources.catalogDimensions, 25);
 });
 
@@ -503,6 +512,32 @@ test('archive lifecycle creates Taste DNA, aggregates it, and deletes it', async
   assert.equal(state.tags.length, 0);
   assert.equal(state.connections.length, 1);
   assert.equal(state.connections[0].reason, 'unrelated');
+});
+
+test('archive management updates review, status, and Taste DNA', async () => {
+  const work = {id: 'book:managed', title: '관리할 책', creator: '작가', mediaType: 'BOOK', description: '기억과 성장에 관한 책', source: 'Open Library'};
+  let response = await worker.fetch(new Request('https://site.test/api/archive', {
+    method: 'POST', headers: {...headers, 'content-type': 'application/json'},
+    body: JSON.stringify({work, rating: 3, myComment: '처음 기록'})
+  }), env);
+  assert.equal(response.status, 201);
+
+  response = await worker.fetch(new Request(`https://site.test/api/archive/${encodeURIComponent(work.id)}`, {
+    method: 'PATCH', headers: {...headers, 'content-type': 'application/json'},
+    body: JSON.stringify({rating: 5, myComment: '기억과 성장이 오래 남았다.', archiveState: 'planned'})
+  }), env);
+  assert.equal(response.status, 200);
+  const updated = await response.json();
+  assert.equal(updated.work.rating, 5);
+  assert.equal(updated.work.myComment, '기억과 성장이 오래 남았다.');
+  assert.equal(updated.work.archiveState, 'planned');
+  assert.ok(updated.work.analysis.tags.some(tag => tag.tag === '기억'));
+
+  response = await worker.fetch(new Request('https://site.test/api/archive', {headers}), env);
+  const data = await response.json();
+  assert.equal(data.engine, 'archive-management-v1');
+  assert.equal(data.items[0].archiveState, 'planned');
+  assert.ok(data.items[0].updatedAt);
 });
 
 test('connection graph normalizes archived snake_case work metadata', async () => {

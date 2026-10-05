@@ -40,6 +40,7 @@ create table if not exists public.archive_items (
   ai_comment text not null default '',
   analysis_status text not null default 'pending',
   analysis_json jsonb,
+  archive_state text not null default 'completed',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (user_id, work_id)
@@ -51,12 +52,19 @@ alter table public.archive_items add column if not exists my_comment text not nu
 alter table public.archive_items add column if not exists ai_comment text not null default '';
 alter table public.archive_items add column if not exists analysis_status text not null default 'pending';
 alter table public.archive_items add column if not exists analysis_json jsonb;
+alter table public.archive_items add column if not exists archive_state text not null default 'completed';
 alter table public.archive_items add column if not exists updated_at timestamptz not null default now();
 alter table public.archive_items add column if not exists taste_vector extensions.vector(25);
 
 do $$ begin
   if not exists (select 1 from pg_constraint where conname = 'archive_items_rating_check') then
     alter table public.archive_items add constraint archive_items_rating_check check (rating between 1 and 5);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'archive_items_state_check') then
+    alter table public.archive_items add constraint archive_items_state_check check (archive_state in ('completed', 'planned'));
   end if;
 end $$;
 
@@ -109,6 +117,8 @@ alter table public.recommendation_feedback
 
 create index if not exists archive_items_user_created_idx
   on public.archive_items (user_id, created_at desc);
+create index if not exists archive_items_user_state_idx
+  on public.archive_items (user_id, archive_state, updated_at desc);
 
 create index if not exists taste_tags_user_score_idx
   on public.taste_tags (user_id, score desc);
