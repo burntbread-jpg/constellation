@@ -201,6 +201,12 @@ test.before(() => {
       if (['기생수', '강철의 연금술사'].includes(new URL(url).searchParams.get('q') || '')) return response({docs: []});
       return response({docs: [{key: '/works/OL1W', title: '기억의 책', author_name: ['작가'], first_publish_year: 2020, subject: ['Memory'], publisher: ['문학동네', '민음사'], language: ['kor']}]});
     }
+    if (url.startsWith('https://ko.wikipedia.org/w/api.php')) {
+      const title = new URL(url).searchParams.get('gpssearch');
+      if (title === '기생수') return response({query: {pages: [{pageid: 100, title: '기생수', terms: {description: ['일본의 만화 작품']}, original: {source: 'http://upload.wikimedia.org/parasyte-volume-1.jpg'}}]}});
+      if (title === '강철의 연금술사') return response({query: {pages: [{pageid: 200, title: '강철의 연금술사', terms: {description: ['일본의 만화 작품']}, original: {source: 'https://upload.wikimedia.org/fma-volume-1.jpg'}}]}});
+      return response({query: {pages: []}});
+    }
     if (url === 'https://graphql.anilist.co') {
       const search = JSON.parse(init.body).variables.search;
       if (search === '건버스터') return response({data: {Page: {media: []}}});
@@ -371,6 +377,8 @@ test('search groups manga volumes and sets while keeping the anime adaptation se
   assert.deepEqual(data.items.map(item => [item.title, item.mediaType]), [['기생수', 'MANGA'], ['기생수', 'ANIME']]);
   const manga = data.items[0];
   assert.equal(manga.editionCount, 3);
+  assert.equal(manga.posterUrl, 'https://upload.wikimedia.org/parasyte-volume-1.jpg');
+  assert.equal(manga.artworkSource, 'Wikipedia');
   assert.equal(data.items.some(item => item.title.includes('리버시')), false);
 });
 
@@ -380,6 +388,8 @@ test('search groups complete and limited manga editions without title-specific r
   const data = await result.json();
   assert.deepEqual(data.items.map(item => [item.title, item.mediaType]), [['강철의 연금술사', 'MANGA'], ['강철의 연금술사', 'ANIME']]);
   assert.equal(data.items[0].editionCount, 3);
+  assert.equal(data.items[0].posterUrl, 'https://upload.wikimedia.org/fma-volume-1.jpg');
+  assert.equal(data.items[0].artworkSource, 'Wikipedia');
   assert.equal(data.items.some(item => item.title.includes('4컷')), false);
 });
 
@@ -504,6 +514,18 @@ test('hostile media types are normalized and cannot trap Taste DNA generation', 
   assert.equal(saved.work.posterUrl, null);
   assert.equal(saved.work.rating, 4);
   assert.ok(saved.work.analysis.tags.length >= 6);
+});
+
+test('manga series keep their media type and Wikipedia cover when archived', async () => {
+  const result = await worker.fetch(new Request('https://site.test/api/archive', {
+    method: 'POST',
+    headers: {...headers, 'content-type': 'application/json'},
+    body: JSON.stringify({work: {id: 'googlebooks:fma', title: '강철의 연금술사', creator: 'Hiromu Arakawa', mediaType: 'MANGA', posterUrl: 'https://upload.wikimedia.org/fma-volume-1.jpg'}, rating: 5})
+  }), env);
+  assert.equal(result.status, 201);
+  const saved = await result.json();
+  assert.equal(saved.work.mediaType, 'MANGA');
+  assert.equal(saved.work.posterUrl, 'https://upload.wikimedia.org/fma-volume-1.jpg');
 });
 
 test('shared work metadata is immutable after the first insert', async () => {
