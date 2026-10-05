@@ -22,7 +22,9 @@ const state = {
   tags: [],
   connections: [],
   feedback: new Map(),
-  profileWrites: 0
+  profileWrites: 0,
+  failProfiles: false,
+  failProviders: false
 };
 
 function response(data, status = 200) {
@@ -50,6 +52,7 @@ function mockSupabase(url, init = {}) {
   const body = init.body ? JSON.parse(init.body) : null;
 
   if (method === 'POST' && table === 'profiles') {
+    if (state.failProfiles) return response({message: 'profile storage unavailable'}, 500);
     state.profileWrites++;
     assert.match(body.id, /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
     return response(null, 204);
@@ -167,6 +170,7 @@ test.before(() => {
   globalThis.fetch = async (input, init) => {
     const url = String(input);
     if (url.startsWith(env.SUPABASE_URL)) return mockSupabase(url, init);
+    if (state.failProviders) throw new Error(`Provider unavailable: ${url}`);
     if (url.startsWith('https://api.themoviedb.org/3/search/movie')) {
       const query = new URL(url).searchParams.get('query');
       if (query === '멜랑콜리아') return response({results: []});
@@ -250,6 +254,8 @@ test.beforeEach(() => {
   state.connections = [];
   state.feedback.clear();
   state.profileWrites = 0;
+  state.failProfiles = false;
+  state.failProviders = false;
 });
 
 test.after(() => {
@@ -705,8 +711,35 @@ test('recommendations remain available for an unsaved work without sign-in', asy
   const data = await result.json();
   assert.equal(data.engine, 'public-metadata-cross-media-v1');
   assert.equal(data.diagnostics.publicFallback, true);
-  assert.ok(data.items.length >= 2);
+  assert.ok(data.items.length >= 3);
   assert.ok(data.items.some(item => item.mediaType !== 'BOOK'));
   assert.ok(data.items.every(item => item.fromWorkId === 'googlebooks:norwegian-wood'));
   assert.ok(data.items.every(item => item.persisted === false));
+});
+
+test('recommendations use the built-in catalog when every external provider fails', async () => {
+  state.failProviders = true;
+  const result = await worker.fetch(new Request('https://site.test/api/recommendations', {
+    method: 'POST',
+    headers: {'content-type': 'application/json'},
+    body: JSON.stringify({work: {id: 'unknown:any-work', title: '어떤 작품', mediaType: 'OTHER', description: '기억과 관계를 다루는 작품'}, mode: 'story'})
+  }), env);
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.ok(data.items.length >= 3);
+  assert.equal(data.diagnostics.builtInSafetyNet, true);
+  assert.ok(new Set(data.items.map(item => item.mediaType)).size >= 2);
+});
+
+test('authenticated recommendations fall back when profile persistence fails', async () => {
+  state.failProfiles = true;
+  const result = await worker.fetch(new Request('https://site.test/api/recommendations', {
+    method: 'POST',
+    headers: {...headers, 'content-type': 'application/json'},
+    body: JSON.stringify({work: {id: 'googlebooks:norwegian-wood', title: '노르웨이의 숲', mediaType: 'BOOK', description: '사랑과 상실, 고독을 통과하는 청춘'}, mode: 'deep'})
+  }), env);
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.engine, 'public-metadata-cross-media-v1');
+  assert.ok(data.items.length >= 3);
 });
