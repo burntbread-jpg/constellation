@@ -18,10 +18,18 @@ create table if not exists public.works (
   poster_url text,
   description text not null default '',
   tags jsonb not null default '[]'::jsonb,
+  publishers jsonb not null default '[]'::jsonb,
+  edition_verified boolean not null default false,
   source text not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.works add column if not exists taste_analysis jsonb;
+alter table public.works add column if not exists taste_vector extensions.vector(25);
+alter table public.works add column if not exists taste_vector_updated_at timestamptz;
+alter table public.works add column if not exists publishers jsonb not null default '[]'::jsonb;
+alter table public.works add column if not exists edition_verified boolean not null default false;
 
 create table if not exists public.archive_items (
   user_id uuid not null references public.profiles(id) on delete cascade,
@@ -86,6 +94,7 @@ create table if not exists public.recommendation_feedback (
   to_work_id text not null,
   connection_mode text not null,
   value smallint not null check (value in (-1, 1)),
+  to_work_title_key text,
   shared_tags jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -94,6 +103,9 @@ create table if not exists public.recommendation_feedback (
 
 alter table public.recommendation_feedback
   add column if not exists shared_tags jsonb not null default '[]'::jsonb;
+
+alter table public.recommendation_feedback
+  add column if not exists to_work_title_key text;
 
 create index if not exists archive_items_user_created_idx
   on public.archive_items (user_id, created_at desc);
@@ -109,6 +121,9 @@ create index if not exists recommendation_feedback_user_source_idx
 
 create index if not exists archive_items_taste_vector_idx
   on public.archive_items using hnsw (taste_vector extensions.vector_cosine_ops);
+
+create index if not exists works_taste_vector_idx
+  on public.works using hnsw (taste_vector extensions.vector_cosine_ops);
 
 alter table public.profiles enable row level security;
 alter table public.works enable row level security;
@@ -252,11 +267,13 @@ as $$
 begin
   insert into public.works (
     id, external_id, title, original_title, creator, release_year,
-    media_type, poster_url, description, tags, source
+    media_type, poster_url, description, tags, publishers, edition_verified, source
   ) values (
     p_work->>'id', p_work->>'external_id', p_work->>'title', p_work->>'original_title',
     p_work->>'creator', (p_work->>'release_year')::integer, p_work->>'media_type',
     p_work->>'poster_url', p_work->>'description', coalesce(p_work->'tags', '[]'::jsonb),
+    coalesce(p_work->'publishers', '[]'::jsonb),
+    coalesce((p_work->>'edition_verified')::boolean, false),
     p_work->>'source'
   ) on conflict (id) do nothing;
 
@@ -280,7 +297,7 @@ begin
     where user_id = (p_item->>'user_id')::uuid and work_id = p_item->>'work_id';
 
   insert into public.taste_tags (user_id, work_id, tag, category, score, evidence, engine)
-  select
+  select distinct on (item->>'id')
     (tag->>'user_id')::uuid, tag->>'work_id', tag->>'tag', tag->>'category',
     (tag->>'score')::double precision, tag->>'evidence', tag->>'engine'
   from jsonb_array_elements(p_tags) as tag;
@@ -319,3 +336,91 @@ $$;
 
 revoke all on function public.taste_similarity_edges(uuid, integer) from public, anon, authenticated;
 grant execute on function public.taste_similarity_edges(uuid, integer) to service_role;
+
+create or replace function public.upsert_work_catalog(
+  p_works jsonb
+) returns integer
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  v_count integer := 0;
+begin
+  insert into public.works (
+    id, external_id, title, original_title, creator, release_year,
+    media_type, poster_url, description, tags, publishers, edition_verified, source,
+    taste_analysis, taste_vector, taste_vector_updated_at
+  )
+  select
+    item->>'id', nullif(item->>'external_id', ''), item->>'title',
+    nullif(item->>'original_title', ''), item->>'creator',
+    nullif(item->>'release_year', '')::integer, item->>'media_type',
+    nullif(item->>'poster_url', ''), coalesce(item->>'description', ''),
+    coalesce(item->'tags', '[]'::jsonb), coalesce(item->'publishers', '[]'::jsonb), coalesce((item->>'edition_verified')::boolean, false), coalesce(item->>'source', 'Taste Constellation'),
+    item->'taste_analysis', (item->>'taste_vector')::extensions.vector, now()
+  from jsonb_array_elements(coalesce(p_works, '[]'::jsonb)) as item
+  where nullif(item->>'id', '') is not null
+    and nullif(item->>'title', '') is not null
+  on conflict (id) do update set
+    external_id = coalesce(works.external_id, nullif(excluded.external_id, '')),
+    original_title = coalesce(works.original_title, nullif(excluded.original_title, '')),
+    creator = case when works.creator is null or works.creator = '작자 미상' then excluded.creator else works.creator end,
+    release_year = coalesce(works.release_year, excluded.release_year),
+    media_type = case when works.media_type = 'OTHER' then excluded.media_type else works.media_type end,
+    poster_url = coalesce(works.poster_url, excluded.poster_url),
+    description = case when length(excluded.description) > length(works.description) then excluded.description else works.description end,
+    tags = case when jsonb_array_length(excluded.tags) > jsonb_array_length(works.tags) then excluded.tags else works.tags end,
+    publishers = case when jsonb_array_length(excluded.publishers) > jsonb_array_length(works.publishers) then excluded.publishers else works.publishers end,
+    edition_verified = works.edition_verified or excluded.edition_verified,
+    taste_analysis = excluded.taste_analysis,
+    taste_vector = excluded.taste_vector,
+    taste_vector_updated_at = now(),
+    updated_at = now();
+  get diagnostics v_count = row_count;
+  return v_count;
+end;
+$$;
+
+revoke all on function public.upsert_work_catalog(jsonb) from public, anon, authenticated;
+grant execute on function public.upsert_work_catalog(jsonb) to service_role;
+
+create or replace function public.match_work_catalog(
+  p_query extensions.vector(25),
+  p_excluded text[] default array[]::text[],
+  p_limit integer default 48
+) returns table (
+  id text,
+  external_id text,
+  title text,
+  original_title text,
+  creator text,
+  release_year integer,
+  media_type text,
+  poster_url text,
+  description text,
+  tags jsonb,
+  publishers jsonb,
+  edition_verified boolean,
+  source text,
+  taste_analysis jsonb,
+  similarity double precision
+)
+language sql
+security definer
+set search_path = public, extensions
+stable
+as $$
+  select
+    w.id, w.external_id, w.title, w.original_title, w.creator, w.release_year,
+    w.media_type, w.poster_url, w.description, w.tags, w.publishers, w.edition_verified, w.source, w.taste_analysis,
+    1 - (w.taste_vector <=> p_query) as similarity
+  from public.works w
+  where w.taste_vector is not null
+    and not (w.id = any(coalesce(p_excluded, array[]::text[])))
+  order by w.taste_vector <=> p_query
+  limit greatest(1, least(coalesce(p_limit, 48), 100));
+$$;
+
+revoke all on function public.match_work_catalog(extensions.vector, text[], integer) from public, anon, authenticated;
+grant execute on function public.match_work_catalog(extensions.vector, text[], integer) to service_role;

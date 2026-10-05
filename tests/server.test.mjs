@@ -22,6 +22,7 @@ const state = {
   tags: [],
   connections: [],
   feedback: new Map(),
+  catalogQueries: [],
   profileWrites: 0,
   backfillCalls: 0,
   failProfiles: false,
@@ -44,6 +45,11 @@ function cosine(a, b) {
   const magnitude = values => Math.sqrt(values.reduce((sum, value) => sum + value * value, 0));
   const denominator = magnitude(a) * magnitude(b);
   return denominator ? dot / denominator : 0;
+}
+
+function catalogVector(entries = {}) {
+  const axes = ['고독','자아정체성','기억','상실','성장','가족','사랑과 친밀감','인간과 비인간','계급과 불평등','권력과 통제','존재와 죽음','연결의 실패','종말과 재난','미지와 우주','기술과 미래','꿈과 현실','신체와 변형','도시적 고독','공간과 경계','운명과 선택','정의와 죄책감','자연과 인간','멜랑콜리','불안과 공포','유머와 아이러니'];
+  return `[${axes.map(axis => Number(entries[axis] || 0).toFixed(4)).join(',')}]`;
 }
 
 function mockSupabase(url, init = {}) {
@@ -76,6 +82,31 @@ function mockSupabase(url, init = {}) {
       }
     }
     return response({vectors, connections, version: 1});
+  }
+  if (method === 'POST' && table === 'upsert_work_catalog') {
+    const ids = (body.p_works || []).map(work => work.id);
+    if (new Set(ids).size !== ids.length) return response({code: '21000', message: 'ON CONFLICT DO UPDATE command cannot affect row a second time'}, 400);
+    for (const work of body.p_works || []) {
+      const previous = state.works.get(work.id) || {};
+      state.works.set(work.id, {
+        ...work,
+        ...previous,
+        taste_analysis: work.taste_analysis,
+        taste_vector: work.taste_vector
+      });
+    }
+    return response((body.p_works || []).length);
+  }
+  if (method === 'POST' && table === 'match_work_catalog') {
+    state.catalogQueries.push(body.p_query);
+    const query = vector(body.p_query);
+    const excluded = new Set(body.p_excluded || []);
+    const matches = [...state.works.values()]
+      .filter(work => work.taste_vector && !excluded.has(work.id))
+      .map(work => ({...work, similarity: cosine(query, vector(work.taste_vector))}))
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, body.p_limit || 48);
+    return response(matches);
   }
   if (method === 'POST' && table === 'save_archive_analysis') {
     const {p_work: work, p_item: item, p_tags: tags} = body;
@@ -165,6 +196,10 @@ function mockSupabase(url, init = {}) {
     const connectionMode = value('connection_mode');
     return response([...state.feedback.values()].filter(row => row.user_id === value('user_id') && (!fromWorkId || row.from_work_id === fromWorkId) && (!connectionMode || row.connection_mode === connectionMode)));
   }
+  if (method === 'GET' && table === 'works') {
+    const id = parsed.searchParams.get('id')?.replace(/^eq\./, '');
+    return response([...state.works.values()].filter(work => !id || work.id === id).map(work => ({id: work.id, title: work.title})));
+  }
   return response({message: `Unhandled mock request: ${method} ${table}`}, 500);
 }
 
@@ -200,7 +235,9 @@ test.before(() => {
       ]});
       return response({items: [
         {id: 'ordinary', volumeInfo: {title: '기억의 책', authors: ['작가'], language: 'ko', publisher: '일반출판사', imageLinks: {thumbnail: 'http://books.test/ordinary.jpg'}}},
-        {id: 'literary', volumeInfo: {title: '기억의 책', authors: ['작가'], language: 'ko', publisher: '민음사', industryIdentifiers: [{type: 'ISBN_13', identifier: '9780000000001'}], imageLinks: {large: 'http://books.test/literary.jpg?zoom=1'}}}
+        {id: 'literary', volumeInfo: {title: '기억의 책', authors: ['작가'], language: 'ko', publisher: '민음사', industryIdentifiers: [{type: 'ISBN_13', identifier: '9780000000001'}], imageLinks: {large: 'http://books.test/literary.jpg?zoom=1'}}},
+        {id: 'web-novel', volumeInfo: {title: '기억의 웹소설', authors: ['작가'], language: 'ko', publisher: '가상출판사', categories: ['웹소설'], imageLinks: {large: 'http://books.test/web-novel.jpg'}}},
+        {id: 'no-publisher', volumeInfo: {title: '출판 정보 없는 책', authors: ['작가'], language: 'ko', imageLinks: {large: 'http://books.test/no-publisher.jpg'}}}
       ]});
     }
     if (url.startsWith('https://openlibrary.org/')) {
@@ -280,6 +317,8 @@ test('health reports free providers and configured persistence', async () => {
   assert.equal(data.sources.artworkEngine, 'official-artwork-ranking-v1');
   assert.deepEqual(data.sources.awardCatalog, {literature: 10, film: 12, animation: 7});
   assert.equal(data.sources.tasteEngine, 'taste-profile-feedback-v2');
+  assert.equal(data.sources.recommendationEngine, 'pgvector-catalog-feedback-v1');
+  assert.equal(data.sources.catalogDimensions, 25);
 });
 
 test('artwork chooses a high resolution Korean official film poster', async () => {
@@ -377,6 +416,19 @@ test('search combines free Open Library and AniList results without paid keys', 
   assert.equal(data.sources.TMDB, 'needs_key');
   assert.equal(data.sources['Google Books'], 'needs_key');
   assert.deepEqual(data.items.map(item => item.source).sort(), ['AniList', 'Open Library']);
+});
+
+test('book search excludes web novels and records without a published edition', async () => {
+  const result = await worker.fetch(new Request('https://site.test/api/search?q=기억'), env);
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.bookPolicy, 'published-editions-only');
+  const books = data.items.filter(item => item.mediaType === 'BOOK');
+  assert.ok(books.length > 0);
+  assert.ok(books.every(item => item.publishers.length > 0));
+  assert.ok(books.every(item => !/웹\s*소설|web\s*novel/iu.test(`${item.title} ${(item.tags || []).join(' ')}`)));
+  assert.ok(!state.works.has('googlebooks:web-novel'));
+  assert.ok(!state.works.has('googlebooks:no-publisher'));
 });
 
 test('search groups manga volumes and sets while keeping the anime adaptation separate', async () => {
@@ -630,6 +682,16 @@ test('live recommendations cross media and explain the shared Taste DNA', async 
     work_id: 'openlibrary:/works/OL1W',
     work_json: {id: 'openlibrary:/works/OL1W', title: '기억의 책', media_type: 'BOOK'}
   });
+  state.works.set('catalog:film:memory', {
+    id: 'catalog:film:memory', title: '기억의 영화', original_title: null, creator: '감독',
+    release_year: 2024, media_type: 'FILM', poster_url: null,
+    description: '기억과 상실, 가족과 우주를 다루는 영화', tags: ['기억', '상실'], source: 'Catalog',
+    taste_analysis: {engine: 'metadata-lexicon-v1', tags: [
+      {tag: '기억', category: 'STORY', score: .94}, {tag: '상실', category: 'MOOD', score: .91},
+      {tag: '가족', category: 'STORY', score: .83}, {tag: '미지와 우주', category: 'IDEA', score: .8}
+    ]},
+    taste_vector: catalogVector({기억: .94, 상실: .91, 가족: .83, '미지와 우주': .8})
+  });
   const result = await worker.fetch(new Request('https://site.test/api/recommendations', {
     method: 'POST',
     headers: {...headers, 'content-type': 'application/json'},
@@ -640,9 +702,11 @@ test('live recommendations cross media and explain the shared Taste DNA', async 
   }), env);
   assert.equal(result.status, 200);
   const data = await result.json();
-  assert.equal(data.engine, 'taste-feedback-personalization-v2');
+  assert.equal(data.engine, 'pgvector-catalog-feedback-v1');
+  assert.ok(data.diagnostics.pgvectorCandidates >= 1);
+  assert.equal(data.diagnostics.dimensions, 25);
   assert.ok(data.items.every(item => typeof item.personalization === 'number'));
-  assert.ok(data.diagnostics.queries.length >= 1 && data.diagnostics.queries.length <= 2);
+  assert.ok(data.diagnostics.queries.length >= 1 && data.diagnostics.queries.length <= 3);
   assert.ok(data.diagnostics.mediaTypes.length >= 1);
   assert.ok(data.items.length >= 1);
   assert.ok(data.items.some(item => item.mediaType !== 'BOOK'));
@@ -688,7 +752,7 @@ test('negative recommendation feedback is persisted and excludes the work', asyn
   }), env);
   const nextData = await next.json();
   assert.ok(nextData.items.every(item => item.id !== rejected.id));
-  assert.equal(nextData.diagnostics.feedbackSignals, 1);
+  assert.equal(nextData.diagnostics.rejected, 1);
   assert.equal(nextData.diagnostics.globalFeedbackSignals, 1);
   assert.equal(nextData.diagnostics.preferenceTags, rejected.sharedTags.length);
   assert.equal(state.backfillCalls, 0);
@@ -742,8 +806,8 @@ test('recommendations remain available for an unsaved work without sign-in', asy
   }), env);
   assert.equal(result.status, 200);
   const data = await result.json();
-  assert.equal(data.engine, 'public-metadata-cross-media-v1');
-  assert.equal(data.diagnostics.publicFallback, true);
+  assert.equal(data.engine, 'metadata-catalog-safety-net-v1');
+  assert.equal(data.diagnostics.builtInSafetyNet, true);
   assert.ok(data.items.length >= 3);
   assert.ok(data.items.some(item => item.mediaType !== 'BOOK'));
   assert.ok(data.items.every(item => item.fromWorkId === 'googlebooks:norwegian-wood'));
@@ -784,6 +848,92 @@ test('authenticated recommendations fall back when profile persistence fails', a
   }), env);
   assert.equal(result.status, 200);
   const data = await result.json();
-  assert.equal(data.engine, 'public-metadata-cross-media-v1');
+  assert.equal(data.engine, 'metadata-catalog-safety-net-v1');
   assert.ok(data.items.length >= 3);
+});
+
+test('catalog indexing ignores client-owned metadata, recomputes analysis, and deduplicates IDs', async () => {
+  state.failProfiles = false;
+  state.failProviders = false;
+  state.works.set('openlibrary:/works/OL1W', {id: 'openlibrary:/works/OL1W', title: '기억의 책', source: 'Open Library'});
+  const result = await worker.fetch(new Request('https://site.test/api/recommendations', {
+    method: 'POST',
+    headers: {'content-type': 'application/json'},
+    body: JSON.stringify({
+      work: {
+        id: 'openlibrary:/works/OL1W', title: 'HACKED TITLE', mediaType: 'BOOK',
+        analysis: {tags: [{tag: '고독', category: 'MOOD', score: 999}], aiComment: 'PRIVATE: do not persist'}
+      },
+      mode: 'deep'
+    })
+  }), env);
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.ok(data.diagnostics.catalogIndexed > 0);
+  assert.equal(state.works.get('openlibrary:/works/OL1W').title, '기억의 책');
+  assert.notEqual(state.works.get('openlibrary:/works/OL1W').taste_analysis?.aiComment, 'PRIVATE: do not persist');
+});
+
+test('catalog analysis remains internal and mode weighting changes the pgvector query', async () => {
+  state.catalogQueries.length = 0;
+  state.works.set('catalog:private-analysis', {
+    id: 'catalog:private-analysis', title: '비공개 분석 오염 작품', creator: '작가', media_type: 'FILM',
+    description: '기억과 상실', tags: ['기억', '상실'], source: 'Catalog',
+    taste_analysis: {tags: [{tag: '기억', category: 'STORY', score: .9}], aiComment: 'PRIVATE: leaked review'},
+    taste_vector: catalogVector({기억: .9, 상실: .8})
+  });
+  const work = {
+    id: 'mode:test', title: '모드 테스트', mediaType: 'BOOK',
+    analysis: {tags: [
+      {tag: '기억', category: 'STORY', score: .9},
+      {tag: '상실', category: 'MOOD', score: .8}
+    ]}
+  };
+  const responses = [];
+  for (const mode of ['story', 'mood']) {
+    const response = await worker.fetch(new Request('https://site.test/api/recommendations', {
+      method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({work, mode})
+    }), env);
+    responses.push(await response.json());
+  }
+  assert.equal(state.catalogQueries.length, 2);
+  assert.notEqual(state.catalogQueries[0], state.catalogQueries[1]);
+  assert.ok(responses.flatMap(data => data.items).every(item => !('analysis' in item)));
+  assert.doesNotMatch(JSON.stringify(responses), /PRIVATE: leaked review/);
+});
+
+test('saved and rejected titles stay excluded across provider IDs', async () => {
+  state.feedback.clear();
+  state.connections = [];
+  state.failProfiles = false;
+  state.archive.set(`${userId}:tmdb:movie:152601`, {
+    user_id: userId,
+    work_id: 'tmdb:movie:152601',
+    work_json: {id: 'tmdb:movie:152601', title: 'Her', media_type: 'FILM'}
+  });
+  const source = {id: 'title-exclusion:source', title: '관계의 경계', mediaType: 'BOOK', description: '사랑과 고독, 기술과 미래'};
+  let response = await worker.fetch(new Request('https://site.test/api/recommendations', {
+    method: 'POST', headers: {...headers, 'content-type': 'application/json'}, body: JSON.stringify({work: source, mode: 'idea'})
+  }), env);
+  let data = await response.json();
+  assert.ok(data.items.every(item => item.title !== 'Her'));
+
+  state.archive.delete(`${userId}:tmdb:movie:152601`);
+  state.works.set('fallback:film:her', {...state.works.get('fallback:film:her'), id: 'fallback:film:her', title: 'Her'});
+  response = await worker.fetch(new Request('https://site.test/api/recommendation-feedback', {
+    method: 'POST', headers: {...headers, 'content-type': 'application/json'},
+    body: JSON.stringify({fromWorkId: source.id, toWorkId: 'fallback:film:her', mode: 'idea', value: -1, sharedTags: ['기술과 미래']})
+  }), env);
+  assert.equal(response.status, 200);
+  state.works.set('tmdb:movie:her-alternate', {
+    id: 'tmdb:movie:her-alternate', title: 'Her', creator: 'Spike Jonze', media_type: 'FILM',
+    description: '기술과 사랑', tags: ['기술과 미래'], source: 'TMDB',
+    taste_analysis: {tags: [{tag: '기술과 미래', category: 'IDEA', score: .95}]},
+    taste_vector: catalogVector({'기술과 미래': .95})
+  });
+  response = await worker.fetch(new Request('https://site.test/api/recommendations', {
+    method: 'POST', headers: {...headers, 'content-type': 'application/json'}, body: JSON.stringify({work: source, mode: 'idea'})
+  }), env);
+  data = await response.json();
+  assert.ok(data.items.every(item => item.title !== 'Her'));
 });
