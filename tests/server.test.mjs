@@ -937,3 +937,36 @@ test('saved and rejected titles stay excluded across provider IDs', async () => 
   data = await response.json();
   assert.ok(data.items.every(item => item.title !== 'Her'));
 });
+
+test('constellation graph combines Taste DNA similarity with saved discovery paths', async () => {
+  const first = 'constellation:first';
+  const second = 'constellation:second';
+  state.works.set(first, {id: first, title: '첫 번째 별', media_type: 'BOOK', creator: '작가', tags: ['기억']});
+  state.works.set(second, {id: second, title: '두 번째 별', media_type: 'FILM', creator: '감독', tags: ['기억']});
+  state.archive.set(`${userId}:${first}`, {
+    user_id: userId, work_id: first, work_json: state.works.get(first), rating: 5,
+    analysis_json: {tags: [{tag: '기억', category: 'STORY', score: .9}]},
+    taste_vector: catalogVector({기억: .9})
+  });
+  state.archive.set(`${userId}:${second}`, {
+    user_id: userId, work_id: second, work_json: state.works.get(second), rating: 4,
+    analysis_json: {tags: [{tag: '기억', category: 'STORY', score: .85}]},
+    taste_vector: catalogVector({기억: .85})
+  });
+  state.connections.push({
+    user_id: userId, from_work_id: first, to_work_id: second, connection_type: 'story:v3',
+    reason: '기억을 다루는 방식이 연결됩니다.', score: .92, shared_tags: ['기억'], work_json: state.works.get(second)
+  });
+  const result = await worker.fetch(new Request('https://site.test/api/constellation', {headers}), env);
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.engine, 'constellation-graph-v2');
+  assert.ok(data.nodes.some(node => node.id === first));
+  assert.ok(data.nodes.some(node => node.id === second));
+  const edge = data.edges.find(item => new Set([item.sourceId, item.targetId]).has(first) && new Set([item.sourceId, item.targetId]).has(second));
+  assert.ok(edge);
+  assert.equal(edge.discovery, true);
+  assert.ok(edge.sharedTags.includes('기억'));
+  assert.ok(data.stats.connections >= 1);
+  assert.ok(data.bridge);
+});
