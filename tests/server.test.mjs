@@ -23,6 +23,7 @@ const state = {
   connections: [],
   feedback: new Map(),
   profileWrites: 0,
+  backfillCalls: 0,
   failProfiles: false,
   failProviders: false
 };
@@ -58,6 +59,7 @@ function mockSupabase(url, init = {}) {
     return response(null, 204);
   }
   if (method === 'POST' && table === 'backfill_taste_graph') {
+    state.backfillCalls++;
     const items = [...state.archive.values()].filter(item => item.user_id === body.p_user_id);
     let vectors = 0;
     for (const item of items) if (!item.taste_vector && item.analysis_json?.tags) {
@@ -254,6 +256,7 @@ test.beforeEach(() => {
   state.connections = [];
   state.feedback.clear();
   state.profileWrites = 0;
+  state.backfillCalls = 0;
   state.failProfiles = false;
   state.failProviders = false;
 });
@@ -688,6 +691,36 @@ test('negative recommendation feedback is persisted and excludes the work', asyn
   assert.equal(nextData.diagnostics.feedbackSignals, 1);
   assert.equal(nextData.diagnostics.globalFeedbackSignals, 1);
   assert.equal(nextData.diagnostics.preferenceTags, rejected.sharedTags.length);
+  assert.equal(state.backfillCalls, 0);
+});
+
+test('hiding every visible recommendation backfills with different works', async () => {
+  const work = {id: 'book:hide-all', title: '숨김 회귀 테스트', mediaType: 'BOOK', description: '기억과 상실, 가족과 우주'};
+  const first = await worker.fetch(new Request('https://site.test/api/recommendations', {
+    method: 'POST', headers: {...headers, 'content-type': 'application/json'}, body: JSON.stringify({work, mode: 'deep'})
+  }), env);
+  const firstData = await first.json();
+  assert.equal(first.status, 200);
+  assert.ok(firstData.items.length > 0);
+  const rejected = new Set(firstData.items.map(item => item.id));
+
+  for (const item of firstData.items) {
+    const feedback = await worker.fetch(new Request('https://site.test/api/recommendation-feedback', {
+      method: 'POST', headers: {...headers, 'content-type': 'application/json'},
+      body: JSON.stringify({fromWorkId: work.id, toWorkId: item.id, mode: 'deep', value: -1, sharedTags: item.sharedTags})
+    }), env);
+    assert.equal(feedback.status, 200);
+  }
+
+  const next = await worker.fetch(new Request('https://site.test/api/recommendations', {
+    method: 'POST', headers: {...headers, 'content-type': 'application/json'}, body: JSON.stringify({work, mode: 'deep'})
+  }), env);
+  const nextData = await next.json();
+  assert.equal(next.status, 200);
+  assert.ok(nextData.items.length > 0);
+  assert.ok(nextData.items.every(item => !rejected.has(item.id)));
+  assert.ok(state.connections.every(row => !rejected.has(row.to_work_id)));
+  assert.equal(state.backfillCalls, 0);
 });
 
 test('Taste profile exposes preference signals learned from recommendation feedback', async () => {
@@ -729,6 +762,17 @@ test('recommendations use the built-in catalog when every external provider fail
   assert.ok(data.items.length >= 3);
   assert.equal(data.diagnostics.builtInSafetyNet, true);
   assert.ok(new Set(data.items.map(item => item.mediaType)).size >= 2);
+});
+
+test('malformed client analysis cannot break the public recommendation fallback', async () => {
+  const result = await worker.fetch(new Request('https://site.test/api/recommendations', {
+    method: 'POST',
+    headers: {'content-type': 'application/json'},
+    body: JSON.stringify({work: {id: 'unknown:malformed', title: '불완전한 작품', mediaType: 'OTHER', analysis: {tags: [null]}}, mode: 'deep'})
+  }), env);
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.items.length, 3);
 });
 
 test('authenticated recommendations fall back when profile persistence fails', async () => {
