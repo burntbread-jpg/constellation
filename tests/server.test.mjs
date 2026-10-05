@@ -695,11 +695,18 @@ test('Taste profile exposes preference signals learned from recommendation feedb
   assert.deepEqual(data.learnedTags.map(item => [item.tag, item.sentiment]), [['기억', 'more'], ['고독', 'more'], ['폭력', 'less']]);
 });
 
-test('recommendations require a signed-in visitor', async () => {
+test('recommendations remain available for an unsaved work without sign-in', async () => {
   const result = await worker.fetch(new Request('https://site.test/api/recommendations', {
     method: 'POST',
     headers: {'content-type': 'application/json'},
-    body: JSON.stringify({work: {id: 'book:source', title: '기억', mediaType: 'BOOK'}})
+    body: JSON.stringify({work: {id: 'googlebooks:norwegian-wood', title: '노르웨이의 숲', mediaType: 'BOOK', description: '사랑과 상실, 고독을 통과하는 청춘'}, mode: 'deep'})
   }), env);
-  assert.equal(result.status, 401);
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.engine, 'public-metadata-cross-media-v1');
+  assert.equal(data.diagnostics.publicFallback, true);
+  assert.ok(data.items.length >= 2);
+  assert.ok(data.items.some(item => item.mediaType !== 'BOOK'));
+  assert.ok(data.items.every(item => item.fromWorkId === 'googlebooks:norwegian-wood'));
+  assert.ok(data.items.every(item => item.persisted === false));
 });
