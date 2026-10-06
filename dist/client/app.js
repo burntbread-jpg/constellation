@@ -11,9 +11,13 @@ const recs={
 let current='evangelion', mode='deep';
 let searchTimer=0, searchController=null, recommendationController=null, recommendationCache=new Map, culturalContextCache=new Map, publisherCache=new Map, editorialCache=new Map, artworkCache=new Map;
 let archive=[], archiveReady=false, archiveError='', tasteProfile={tags:[],statement:''}, similarityEdges=[], connectionGraph=[], constellationGraph=null, graphFilter='all', archiveQuery='', archiveType='all', archiveState='all', archiveSort='updated', selectedRating=5, toastTimer=0;
+let installPrompt=null;
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const esc=value=>String(value??'').replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
 const safeUrl=value=>{if(!value)return'';try{const u=new URL(String(value),location.origin);return u.protocol==='http:'||u.protocol==='https:'?u.href:''}catch{return''}};
+function updateConnectionStatus(){const status=$('#connectionStatus');if(!status)return;status.hidden=navigator.onLine;document.documentElement.classList.toggle('is-offline',!navigator.onLine)}
+async function installApp(){if(!installPrompt)return;const prompt=installPrompt;installPrompt=null;$('#installApp').hidden=true;await prompt.prompt();const choice=await prompt.userChoice;if(choice.outcome==='accepted')toast('취향 성좌를 홈 화면에 설치했어요.')}
+function enableAppShell(){updateConnectionStatus();addEventListener('online',()=>{updateConnectionStatus();toast('연결이 복구됐어요.')});addEventListener('offline',updateConnectionStatus);addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;$('#installApp').hidden=false});addEventListener('appinstalled',()=>{installPrompt=null;$('#installApp').hidden=true});$('#installApp').onclick=installApp;if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js').catch(()=>{}))}
 const AWARD_CONTEXT={'신세기에반게리온':['Seiun Award','Animation Kobe Award','Nihon SF Taisho','Japan Media Arts Festival Excellence Award'],'기생충':['Cannes Palme d’Or','Academy Best Picture'],'her':['Academy'],'듄':['Hugo','Nebula'],'dune':['Hugo','Nebula'],'어둠의왼손':['Hugo','Nebula'],'thelefthandofdarkness':['Hugo','Nebula'],'한밤의아이들':['Booker'],'midnightschildren':['Booker']};
 const NAMU_DOCUMENTS={'신세기에반게리온':'신세기 에반게리온'};
 const titleKey=value=>String(value||'').normalize('NFKC').toLowerCase().replace(/[^a-z0-9가-힣]/g,'');
@@ -80,3 +84,4 @@ $('#searchInput').oninput=e=>{const q=e.target.value.trim();clearTimeout(searchT
 $('#searchResults').onclick=e=>{const b=e.target.closest('[data-result]');if(b)selectWork(b.dataset.result)};
 document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();$('#searchInput').focus()}});document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))$('#searchResults').hidden=true});
 $('#archiveCount').textContent='…';renderWork();loadArchive();
+enableAppShell();

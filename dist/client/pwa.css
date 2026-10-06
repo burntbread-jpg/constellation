@@ -1,0 +1,53 @@
+.connection-status {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  padding: .72rem 1rem;
+  border-bottom: 1px solid rgba(211, 255, 69, .25);
+  background: rgba(28, 31, 24, .96);
+  color: #d9e3c0;
+  font-size: .875rem;
+  line-height: 1.45;
+  text-align: center;
+  backdrop-filter: blur(12px);
+}
+
+.install-app {
+  min-height: 2.25rem;
+  padding: 0 .9rem;
+  border: 1px solid rgba(211, 255, 69, .38);
+  border-radius: 999px;
+  background: rgba(211, 255, 69, .08);
+  color: #d3ff45;
+  font: inherit;
+  font-size: .82rem;
+  cursor: pointer;
+}
+
+.install-app:hover,
+.install-app:focus-visible {
+  background: rgba(211, 255, 69, .15);
+  outline: none;
+}
+
+@media (max-width: 620px) {
+  .install-app {
+    width: 2.35rem;
+    padding: 0;
+    overflow: hidden;
+    color: transparent;
+    white-space: nowrap;
+  }
+
+  .install-app::after {
+    content: '\2193';
+    display: grid;
+    place-items: center;
+    color: #d3ff45;
+    font-size: 1.1rem;
+  }
+}
+
+@media (display-mode: standalone) {
+  .install-app { display: none !important; }
+}

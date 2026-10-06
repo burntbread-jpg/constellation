@@ -1,0 +1,15 @@
+{
+  "name": "취향 성좌",
+  "short_name": "취향 성좌",
+  "description": "좋아하는 작품의 이유를 따라 영화, 책, 애니를 건너가는 취향 아카이브",
+  "lang": "ko",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b0e13",
+  "theme_color": "#0b0e13",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
