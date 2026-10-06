@@ -7,7 +7,7 @@
   <title>취향 성좌 — 장르 밖으로 이어지는 작품</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="live-search.css" />
-  <link rel="stylesheet" href="archive.css?v=41" />
+  <link rel="stylesheet" href="archive.css?v=42" />
 </head>
 <body>
   <header class="topbar">
@@ -99,6 +99,15 @@
       </section>
       <section class="archive-manager" aria-labelledby="archiveManagerTitle">
         <div class="manager-heading"><div><p class="eyebrow">ARCHIVE LIBRARY</p><h2 id="archiveManagerTitle">저장 작품 관리</h2></div><small id="archiveResultCount">0개 작품</small></div>
+        <div class="archive-portability" aria-label="아카이브 백업과 복원">
+          <div><strong>내 데이터 보관</strong><small>개인 감상까지 포함해 백업하거나 다른 브라우저에서 복원할 수 있어요.</small></div>
+          <div class="archive-portability-actions">
+            <button id="exportArchiveJson" type="button">JSON 백업</button>
+            <button id="exportArchiveCsv" type="button">CSV 내보내기</button>
+            <button id="importArchiveButton" type="button">JSON 가져오기</button>
+            <input id="importArchiveFile" type="file" accept="application/json,.json" hidden />
+          </div>
+        </div>
         <div class="archive-controls">
           <label class="archive-search"><span>검색</span><input id="archiveSearch" type="search" placeholder="제목·작가·Taste DNA" /></label>
           <label><span>매체</span><select id="archiveTypeFilter"><option value="all">전체 매체</option><option value="FILM">영화</option><option value="TV">TV</option><option value="ANIME">애니</option><option value="BOOK">책</option><option value="MANGA">만화</option></select></label>
@@ -146,6 +155,6 @@
     </form>
   </dialog>
   <div id="toast" class="toast" role="status"></div>
-  <script src="app.js?v=41"></script>
+  <script src="app.js?v=42"></script>
 </body>
 </html>
