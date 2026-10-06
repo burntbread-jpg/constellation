@@ -865,6 +865,27 @@ test('recommendations use the built-in catalog when every external provider fail
   assert.ok(new Set(data.items.map(item => item.mediaType)).size >= 2);
 });
 
+test('all connection modes satisfy the release quality gate', async () => {
+  state.failProviders = true;
+  const work = {id: 'quality:persona', title: '퍼소나', creator: '잉마르 베리만', year: 1966, mediaType: 'FILM', description: '침묵과 얼굴, 정체성의 균열을 응시하는 영화'};
+  const signatures = new Set();
+  for (const mode of ['story', 'mood', 'idea', 'visual', 'deep']) {
+    const response = await worker.fetch(new Request('https://site.test/api/recommendations', {
+      method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({work, mode})
+    }), env);
+    assert.equal(response.status, 200);
+    const data = await response.json();
+    assert.equal(data.items.length, 3);
+    assert.equal(new Set(data.items.map(item => item.id)).size, data.items.length);
+    assert.ok(new Set(data.items.map(item => item.mediaType)).size >= 2);
+    assert.ok(data.items.every(item => Number.isInteger(item.year) && item.year >= 1800));
+    assert.ok(data.items.every(item => item.editorialIntro?.endsWith('작품.')));
+    assert.ok(data.items.every(item => !item.editorialIntro.includes(`${work.title}에서`)));
+    signatures.add(data.items.map(item => item.id).join('|'));
+  }
+  assert.ok(signatures.size >= 3);
+});
+
 test('malformed client analysis cannot break the public recommendation fallback', async () => {
   const result = await worker.fetch(new Request('https://site.test/api/recommendations', {
     method: 'POST',
