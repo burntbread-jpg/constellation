@@ -748,6 +748,7 @@ test('live recommendations cross media and explain the shared Taste DNA', async 
   assert.ok(data.items.every(item => item.id !== 'openlibrary:/works/OL1W'));
   assert.equal(data.diagnostics.excludedSaved, 1);
   assert.ok(data.items.every(item => item.reason && item.similarity > 0));
+  assert.ok(data.items.every(item => item.editorialIntro && !item.editorialIntro.includes('기억을 걷는 사람에서')));
   assert.ok(data.items.every(item => item.persisted));
   assert.equal(state.connections.length, data.items.length);
 
@@ -759,6 +760,7 @@ test('live recommendations cross media and explain the shared Taste DNA', async 
   const cachedData = await cached.json();
   assert.equal(cachedData.cached, true);
   assert.equal(cachedData.items.length, data.items.length);
+  assert.ok(cachedData.items.every(item => item.editorialIntro));
 
   const graph = await worker.fetch(new Request('https://site.test/api/connections', {headers}), env);
   assert.equal(graph.status, 200);
