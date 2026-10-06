@@ -1,0 +1,51 @@
+.skip-link {
+  position: fixed;
+  left: 1rem;
+  top: 1rem;
+  z-index: 200;
+  padding: .75rem 1rem;
+  border-radius: .5rem;
+  background: #d7ff57;
+  color: #10120c;
+  font-weight: 800;
+  transform: translateY(-180%);
+}
+
+.skip-link:focus { transform: translateY(0); }
+
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid #d7ff57;
+  outline-offset: 3px;
+}
+
+.rec-card[role="button"]:focus-visible {
+  border-color: #d7ff57;
+  transform: translateY(-3px);
+}
+
+.archive-retry {
+  margin-top: 1rem;
+  min-height: 2.75rem;
+  padding: .65rem 1rem;
+  border: 1px solid #535966;
+  border-radius: .5rem;
+  background: #181b21;
+  color: #f1f2ed;
+  cursor: pointer;
+}
+
+@media (pointer: coarse) {
+  :where(.nav-btn, .quick-picks button, .mode-tabs button, .graph-filters button, .library-actions button, .archive-portability button, .rec-feedback button) {
+    min-height: 2.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
+}

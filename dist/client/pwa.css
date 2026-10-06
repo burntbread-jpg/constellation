@@ -27,7 +27,6 @@
 .install-app:hover,
 .install-app:focus-visible {
   background: rgba(211, 255, 69, .15);
-  outline: none;
 }
 
 @media (max-width: 620px) {

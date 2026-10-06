@@ -15,8 +15,10 @@
   <link rel="stylesheet" href="live-search.css" />
   <link rel="stylesheet" href="archive.css?v=42" />
   <link rel="stylesheet" href="pwa.css?v=44" />
+  <link rel="stylesheet" href="accessibility.css?v=45" />
 </head>
 <body>
+  <a class="skip-link" href="#mainContent">본문으로 건너뛰기</a>
   <header class="topbar">
     <button class="brand" data-view="discover" aria-label="취향 성좌 홈"><span class="mark">✦</span><span>취향 성좌</span></button>
     <nav aria-label="주요 메뉴">
@@ -30,7 +32,7 @@
     오프라인입니다. 저장·검색·추천은 연결이 복구되면 다시 사용할 수 있어요.
   </div>
 
-  <main>
+  <main id="mainContent" tabindex="-1">
     <section id="discoverView">
       <div class="intro">
         <p class="eyebrow">CROSS-MEDIA TASTE ARCHIVE</p>
@@ -38,9 +40,9 @@
         <p class="lead">좋아하는 작품 하나를 골라보세요. 작품을 좋아한 <em>이유</em>를 따라 장르 밖으로 데려가 드릴게요.</p>
         <div class="search-wrap">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m16 16 5 5"></path></svg>
-          <input id="searchInput" type="search" placeholder="영화·책·애니 제목을 검색하세요" autocomplete="off" aria-label="작품 검색" />
+          <input id="searchInput" type="search" placeholder="영화·책·애니 제목을 검색하세요" autocomplete="off" aria-label="작품 검색" aria-controls="searchResults" aria-expanded="false" />
           <kbd>⌘ K</kbd>
-          <div id="searchResults" class="search-results" hidden></div>
+          <div id="searchResults" class="search-results" role="listbox" aria-label="작품 검색 결과" hidden></div>
         </div>
         <div class="quick-picks" aria-label="추천 검색어">
           <span>지금 많이 연결하는 작품</span>
@@ -76,7 +78,7 @@
           </div>
         </div>
         <div id="connectionIntro" class="connection-intro"></div>
-        <div id="recommendations" class="recommendations"></div>
+        <div id="recommendations" class="recommendations" aria-live="polite" aria-busy="false"></div>
       </section>
     </section>
 
@@ -167,6 +169,6 @@
     </form>
   </dialog>
   <div id="toast" class="toast" role="status"></div>
-  <script src="app.js?v=44"></script>
+  <script src="app.js?v=45"></script>
 </body>
 </html>
