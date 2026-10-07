@@ -313,8 +313,13 @@ test.after(() => {
 test('health reports free providers and configured persistence', async () => {
   const result = await worker.fetch(new Request('https://site.test/api/health'), env);
   assert.equal(result.status, 200);
+  assert.equal(result.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(result.headers.get('x-frame-options'), 'DENY');
+  assert.match(result.headers.get('x-request-id'), /^[a-f0-9-]{36}$/);
+  assert.match(result.headers.get('server-timing'), /^app;dur=\d+\.\d$/);
   const data = await result.json();
   assert.equal(data.ok, true);
+  assert.equal(data.runtime, 'production-hardening-v1');
   assert.equal(data.sources.openLibrary, true);
   assert.equal(data.sources.aniList, true);
   assert.equal(data.sources.supabase, true);
@@ -328,6 +333,17 @@ test('health reports free providers and configured persistence', async () => {
   assert.equal(data.sources.recommendationEngine, 'pgvector-catalog-feedback-v1');
   assert.equal(data.sources.archiveEngine, 'archive-management-v1');
   assert.equal(data.sources.catalogDimensions, 25);
+});
+
+test('API routing distinguishes missing paths and unsupported methods', async () => {
+  const missing = await worker.fetch(new Request('https://site.test/api/does-not-exist'), env);
+  assert.equal(missing.status, 404);
+  assert.deepEqual(await missing.json(), {error: 'API 경로를 찾을 수 없습니다.'});
+
+  const unsupported = await worker.fetch(new Request('https://site.test/api/search', {method: 'POST'}), env);
+  assert.equal(unsupported.status, 405);
+  assert.equal(unsupported.headers.get('allow'), 'GET');
+  assert.deepEqual(await unsupported.json(), {error: '지원하지 않는 요청 방식입니다.', allowed: ['GET']});
 });
 
 test('artwork chooses a high resolution Korean official film poster', async () => {

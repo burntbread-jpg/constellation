@@ -152,4 +152,85 @@ async function recommendationsV5(request,env){let payload;try{payload=await requ
 async function recommendationFeedbackV2(request,env){const user=await currentUser(request);if(!user)return json({error:'로그인이 필요합니다.'},401);if(!dbReady(env))return json({error:'Supabase가 아직 연결되지 않았습니다.'},503);let payload;try{payload=await request.json()}catch{return json({error:'JSON 요청 본문이 올바르지 않습니다.'},400)}const fromWorkId=String(payload?.fromWorkId||'').slice(0,240),toWorkId=String(payload?.toWorkId||'').slice(0,240),mode=['story','mood','idea','visual','deep'].includes(payload?.mode)?payload.mode:'deep',value=Number(payload?.value),sharedTags=Array.isArray(payload?.sharedTags)?payload.sharedTags.slice(0,8).map(tag=>String(tag).slice(0,100)):[];if(!fromWorkId||!toWorkId||![1,-1].includes(value))return json({error:'추천 반응 정보가 올바르지 않습니다.'},400);await ensureProfile(env,user,false);let targetRows=[];try{targetRows=await supabase(env,'works?id=eq.'+encodeURIComponent(toWorkId)+'&select=title&limit=1')}catch{}const toWorkTitleKey=recommendationTitleKey(targetRows?.[0]?.title||'');await supabase(env,'recommendation_feedback?on_conflict=user_id,from_work_id,to_work_id,connection_mode',{method:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:{user_id:user.id,from_work_id:fromWorkId,to_work_id:toWorkId,to_work_title_key:toWorkTitleKey||null,connection_mode:mode,value,shared_tags:sharedTags,updated_at:new Date().toISOString()}});if(value===-1)await Promise.all(['v2','v3'].map(version=>supabase(env,`connections?user_id=eq.${encodeURIComponent(user.id)}&from_work_id=eq.${encodeURIComponent(fromWorkId)}&to_work_id=eq.${encodeURIComponent(toWorkId)}&connection_type=eq.${encodeURIComponent(`${mode}:${version}`)}`,{method:'DELETE',prefer:'return=minimal'})));return json({saved:true,value,learnedTags:sharedTags.length})}
 async function constellationMap(request,env){const user=await currentUser(request);if(!user)return json({error:'로그인이 필요합니다.'},401);if(!dbReady(env))return json({error:'Supabase가 아직 연결되지 않았습니다.'},503);const [archiveRows,vectorRows,connectionRows]=await Promise.all([supabase(env,`archive_items?user_id=eq.${encodeURIComponent(user.id)}&select=work_id,work_json,rating,my_comment,ai_comment,analysis_json,created_at&order=updated_at.desc&limit=200`),supabase(env,'rpc/taste_similarity_edges',{method:'POST',body:{p_user_id:user.id,p_limit:100}}),supabase(env,`connections?user_id=eq.${encodeURIComponent(user.id)}&select=from_work_id,to_work_id,connection_type,reason,score,shared_tags&order=score.desc&limit=300`)]),rows=(archiveRows||[]).filter(row=>row.work_json),savedIds=new Set(rows.map(row=>row.work_id)),analysisById=new Map(rows.map(row=>[row.work_id,row.analysis_json])),edges=[],seen=new Set;for(const edge of vectorRows||[]){if(!savedIds.has(edge.source_work_id)||!savedIds.has(edge.target_work_id))continue;const key=[edge.source_work_id,edge.target_work_id].sort().join('|'),left=analysisById.get(edge.source_work_id)?.tags||[],right=new Set((analysisById.get(edge.target_work_id)?.tags||[]).map(tag=>tag.tag)),shared=left.filter(tag=>right.has(tag.tag)).sort((a,b)=>Number(b.score)-Number(a.score)).slice(0,4).map(tag=>tag.tag),score=Math.max(0,Math.min(1,Number(edge.similarity)||0));edges.push({id:`vector:${key}`,sourceId:edge.source_work_id,targetId:edge.target_work_id,type:'taste',score,sharedTags:shared,reason:shared.length?`두 작품은 ${shared.join(' · ')}의 취향 결을 공유합니다.`:'두 작품의 전체 Taste DNA가 닮았습니다.'});seen.add(key)}for(const edge of connectionRows||[]){if(!savedIds.has(edge.from_work_id)||!savedIds.has(edge.to_work_id))continue;const key=[edge.from_work_id,edge.to_work_id].sort().join('|'),existing=edges.find(item=>[item.sourceId,item.targetId].sort().join('|')===key);if(existing){existing.discovery=true;existing.mode=String(edge.connection_type||'').split(':')[0];existing.reason=edge.reason||existing.reason;existing.sharedTags=[...new Set([...existing.sharedTags,...(edge.shared_tags||[])])].slice(0,4);existing.score=Math.max(existing.score,Math.max(0,Math.min(1,Number(edge.score)||0)));continue}edges.push({id:`discovery:${key}`,sourceId:edge.from_work_id,targetId:edge.to_work_id,type:'discovery',discovery:true,mode:String(edge.connection_type||'').split(':')[0],score:Math.max(0,Math.min(1,Number(edge.score)||0)),sharedTags:(edge.shared_tags||[]).slice(0,4),reason:edge.reason||'추천을 따라 발견한 연결입니다.'});seen.add(key)}const centrality=new Map(rows.map(row=>[row.work_id,0]));for(const edge of edges){centrality.set(edge.sourceId,(centrality.get(edge.sourceId)||0)+edge.score);centrality.set(edge.targetId,(centrality.get(edge.targetId)||0)+edge.score)}const adjacency=new Map(rows.map(row=>[row.work_id,[]]));for(const edge of edges.filter(edge=>edge.score>=.42)){adjacency.get(edge.sourceId)?.push(edge.targetId);adjacency.get(edge.targetId)?.push(edge.sourceId)}const clusterById=new Map;let cluster=0;for(const row of rows){if(clusterById.has(row.work_id))continue;const queue=[row.work_id];clusterById.set(row.work_id,cluster);while(queue.length){const id=queue.shift();for(const next of adjacency.get(id)||[])if(!clusterById.has(next)){clusterById.set(next,cluster);queue.push(next)}}cluster++}const nodes=rows.map(row=>({...toClientWork(row.work_json,row),centrality:Number((centrality.get(row.work_id)||0).toFixed(4)),cluster:clusterById.get(row.work_id)||0})).sort((a,b)=>b.centrality-a.centrality),bridge=nodes[0]?.id||null;return json({nodes,edges,bridge,stats:{works:nodes.length,connections:edges.length,clusters:cluster,vectorConnections:edges.filter(edge=>edge.type==='taste').length,discoveryConnections:edges.filter(edge=>edge.discovery).length},engine:'constellation-graph-v2'})}
 async function tasteProfileV2(request,env){const user=await currentUser(request);if(!user||!dbReady(env))return tasteProfile(request,env);const response=await tasteProfile(request,env);if(!response.ok)return response;const data=await response.json(),rows=await supabase(env,`recommendation_feedback?user_id=eq.${encodeURIComponent(user.id)}&select=value,shared_tags&order=updated_at.desc&limit=200`),signals=new Map;for(const row of rows||[])for(const tag of Array.isArray(row.shared_tags)?row.shared_tags:[]){const current=signals.get(tag)||{tag,value:0,count:0};current.value+=Number(row.value)||0;current.count++;signals.set(tag,current)}const learnedTags=[...signals.values()].filter(item=>item.value!==0).sort((a,b)=>Math.abs(b.value)-Math.abs(a.value)||b.count-a.count).slice(0,6).map(item=>({...item,sentiment:item.value>0?'more':'less'}));const positive=learnedTags.find(item=>item.value>0),statement=positive&&data.tags?.length?`${data.statement} 추천 반응에서는 ‘${positive.tag}’의 연결에 특히 끌립니다.`:data.statement;return json({...data,statement,learnedTags,feedbackCount:(rows||[]).length,engine:'taste-profile-feedback-v2'})}
-export default{async fetch(request,env){try{const u=new URL(request.url);if(u.pathname==='/api/search')return await search(request,env);if(u.pathname==='/api/artwork'&&request.method==='GET')return await artwork(request,env);if(u.pathname==='/api/cultural-context'&&request.method==='GET')return await culturalContext(request);if(u.pathname==='/api/book-publishers'&&request.method==='GET')return await bookPublishers(request,env);if(u.pathname==='/api/editorial-intro'&&request.method==='POST')return await editorialIntro(request);if(u.pathname==='/api/recommendations'&&request.method==='POST')return await recommendationsV5(request,env);if(u.pathname==='/api/recommendation-feedback'&&request.method==='POST')return await recommendationFeedbackV2(request,env);if(u.pathname==='/api/connections'&&request.method==='GET')return await connections(request,env);if(u.pathname==='/api/constellation'&&request.method==='GET')return await constellationMap(request,env);if(u.pathname==='/api/archive')return await archive(request,env);if(u.pathname==='/api/taste-profile'&&request.method==='GET')return await tasteProfileV2(request,env);if(u.pathname==='/api/taste-similarities'&&request.method==='GET')return await tasteSimilarities(request,env);if(u.pathname.startsWith('/api/archive/')&&request.method==='PATCH'){let id;try{id=decodeURIComponent(u.pathname.slice(13))}catch{return json({error:'작품 ID가 올바르지 않습니다.'},400)}return await updateArchive(request,env,id)}if(u.pathname.startsWith('/api/archive/')&&request.method==='DELETE'){let id;try{id=decodeURIComponent(u.pathname.slice(13))}catch{return json({error:'작품 ID가 올바르지 않습니다.'},400)}return await removeArchive(request,env,id)}if(u.pathname==='/api/health')return json({ok:true,sources:{tmdb:!!env.TMDB_READ_TOKEN,googleBooks:!!env.GOOGLE_BOOKS_API_KEY,openLibrary:true,aniList:true,wikidata:true,supabase:dbReady(env),culturalContext:'wikidata-authority-catalog-v2',publisherEngine:'korean-editions-v1',editorialEngine:'metadata-editorial-v1',artworkEngine:'official-artwork-ranking-v1',awardCatalog:{literature:10,film:12,animation:7},tasteEngine:'taste-profile-feedback-v2',similarityEngine:'pgvector-cosine-v1',recommendationEngine:'pgvector-catalog-feedback-v1',archiveEngine:'archive-management-v1',catalogDimensions:LEXICON.length}});if(env.ASSETS)return await env.ASSETS.fetch(request);return new Response('Not found',{status:404})}catch(error){console.error(error);return json({error:'요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'},500)}}};
+const SECURITY_HEADERS={
+  'x-content-type-options':'nosniff',
+  'x-frame-options':'DENY',
+  'referrer-policy':'strict-origin-when-cross-origin',
+  'permissions-policy':'camera=(), microphone=(), geolocation=()',
+  'strict-transport-security':'max-age=31536000; includeSubDomains'
+};
+
+function requestId(request){
+  const supplied=request.headers.get('x-request-id');
+  if(supplied&&/^[a-zA-Z0-9._:-]{8,80}$/.test(supplied))return supplied;
+  return crypto.randomUUID();
+}
+
+function finishResponse(response,id,startedAt){
+  const headers=new Headers(response.headers);
+  for(const[key,value]of Object.entries(SECURITY_HEADERS))headers.set(key,value);
+  headers.set('x-request-id',id);
+  headers.set('server-timing',`app;dur=${Math.max(0,performance.now()-startedAt).toFixed(1)}`);
+  return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+}
+
+function methodNotAllowed(allowed){
+  const response=json({error:'지원하지 않는 요청 방식입니다.',allowed},405);
+  response.headers.set('allow',allowed.join(', '));
+  return response;
+}
+
+async function routeApi(request,env,url){
+  const {pathname}=url;
+  if(pathname==='/api/search')return request.method==='GET'?search(request,env):methodNotAllowed(['GET']);
+  if(pathname==='/api/artwork')return request.method==='GET'?artwork(request,env):methodNotAllowed(['GET']);
+  if(pathname==='/api/cultural-context')return request.method==='GET'?culturalContext(request):methodNotAllowed(['GET']);
+  if(pathname==='/api/book-publishers')return request.method==='GET'?bookPublishers(request,env):methodNotAllowed(['GET']);
+  if(pathname==='/api/editorial-intro')return request.method==='POST'?editorialIntro(request):methodNotAllowed(['POST']);
+  if(pathname==='/api/recommendations')return request.method==='POST'?recommendationsV5(request,env):methodNotAllowed(['POST']);
+  if(pathname==='/api/recommendation-feedback')return request.method==='POST'?recommendationFeedbackV2(request,env):methodNotAllowed(['POST']);
+  if(pathname==='/api/connections')return request.method==='GET'?connections(request,env):methodNotAllowed(['GET']);
+  if(pathname==='/api/constellation')return request.method==='GET'?constellationMap(request,env):methodNotAllowed(['GET']);
+  if(pathname==='/api/archive')return ['GET','POST'].includes(request.method)?archive(request,env):methodNotAllowed(['GET','POST']);
+  if(pathname==='/api/taste-profile')return request.method==='GET'?tasteProfileV2(request,env):methodNotAllowed(['GET']);
+  if(pathname==='/api/taste-similarities')return request.method==='GET'?tasteSimilarities(request,env):methodNotAllowed(['GET']);
+  if(pathname.startsWith('/api/archive/')){
+    let id;
+    try{id=decodeURIComponent(pathname.slice(13))}catch{return json({error:'작품 ID가 올바르지 않습니다.'},400)}
+    if(request.method==='PATCH')return updateArchive(request,env,id);
+    if(request.method==='DELETE')return removeArchive(request,env,id);
+    return methodNotAllowed(['PATCH','DELETE']);
+  }
+  if(pathname==='/api/health'){
+    if(request.method!=='GET')return methodNotAllowed(['GET']);
+    return json({
+      ok:true,
+      runtime:'production-hardening-v1',
+      sources:{
+        tmdb:!!env.TMDB_READ_TOKEN,googleBooks:!!env.GOOGLE_BOOKS_API_KEY,openLibrary:true,aniList:true,wikidata:true,
+        supabase:dbReady(env),culturalContext:'wikidata-authority-catalog-v2',publisherEngine:'korean-editions-v1',
+        editorialEngine:'metadata-editorial-v1',artworkEngine:'official-artwork-ranking-v1',
+        awardCatalog:{literature:10,film:12,animation:7},tasteEngine:'taste-profile-feedback-v2',
+        similarityEngine:'pgvector-cosine-v1',recommendationEngine:'pgvector-catalog-feedback-v1',
+        archiveEngine:'archive-management-v1',catalogDimensions:LEXICON.length
+      }
+    });
+  }
+  return json({error:'API 경로를 찾을 수 없습니다.'},404);
+}
+
+export default{
+  async fetch(request,env){
+    const startedAt=performance.now(),id=requestId(request);
+    try{
+      const url=new URL(request.url);
+      const response=url.pathname.startsWith('/api/')
+        ?await routeApi(request,env,url)
+        :env.ASSETS?await env.ASSETS.fetch(request):new Response('Not found',{status:404});
+      return finishResponse(response,id,startedAt);
+    }catch(error){
+      console.error('Request failed',{requestId:id,error});
+      return finishResponse(json({error:'요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.',requestId:id},500),id,startedAt);
+    }
+  }
+};
