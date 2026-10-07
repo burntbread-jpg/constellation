@@ -5,6 +5,7 @@ const SECURITY_HEADERS={
   'permissions-policy':'camera=(), microphone=(), geolocation=()',
   'strict-transport-security':'max-age=31536000; includeSubDomains'
 };
+const RATE_BUCKETS=new Map;
 
 function requestId(request){
   const supplied=request.headers.get('x-request-id');
@@ -33,6 +34,20 @@ function validateMutation(request,url){
   const length=Number(request.headers.get('content-length')||0);
   if(Number.isFinite(length)&&length>262144)return json({error:'요청 데이터가 너무 큽니다.'},413);
   return null;
+}
+
+function rateLimit(request){
+  const mutating=['POST','PATCH','DELETE'].includes(request.method),limit=mutating?30:180,windowMs=60000;
+  const identity=request.headers.get('oai-authenticated-user-id')||request.headers.get('cf-connecting-ip')||'anonymous';
+  const key=`${mutating?'write':'read'}:${identity}`,now=Date.now();
+  let bucket=RATE_BUCKETS.get(key);
+  if(!bucket||now-bucket.startedAt>=windowMs)bucket={startedAt:now,count:0};
+  bucket.count++;RATE_BUCKETS.set(key,bucket);
+  if(RATE_BUCKETS.size>2000)for(const[item,value]of RATE_BUCKETS)if(now-value.startedAt>=windowMs)RATE_BUCKETS.delete(item);
+  if(bucket.count<=limit)return null;
+  const retryAfter=Math.max(1,Math.ceil((windowMs-(now-bucket.startedAt))/1000)),response=json({error:'요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.',retryAfter},429);
+  response.headers.set('retry-after',String(retryAfter));
+  return response;
 }
 
 async function publicMetadata(response,maxAge){
@@ -88,7 +103,7 @@ export default{
     const startedAt=performance.now(),id=requestId(request);
     try{
       const url=new URL(request.url);
-      const rejected=url.pathname.startsWith('/api/')?validateMutation(request,url):null;
+      const rejected=url.pathname.startsWith('/api/')?(rateLimit(request)||validateMutation(request,url)):null;
       const response=url.pathname.startsWith('/api/')
         ?rejected||await routeApi(request,env,url)
         :env.ASSETS?await env.ASSETS.fetch(request):new Response('Not found',{status:404});

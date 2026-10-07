@@ -379,6 +379,16 @@ test('mutation guard rejects cross-origin and oversized requests', async () => {
   assert.deepEqual(await oversized.json(), {error: '요청 데이터가 너무 큽니다.'});
 });
 
+test('mutation rate limit returns a retry window', async () => {
+  let result;
+  for (let index = 0; index < 31; index++) result = await worker.fetch(new Request('https://site.test/api/does-not-exist', {
+    method: 'POST', headers: {'cf-connecting-ip': '203.0.113.27', origin: 'https://site.test', 'content-type': 'application/json'}, body: '{}'
+  }), env);
+  assert.equal(result.status, 429);
+  assert.match(result.headers.get('retry-after'), /^\d+$/);
+  assert.equal((await result.json()).retryAfter > 0, true);
+});
+
 test('artwork chooses a high resolution Korean official film poster', async () => {
   const result = await worker.fetch(new Request('https://site.test/api/artwork?title=%EA%B8%B0%EC%83%9D%EC%B6%A9&mediaType=FILM'), {...env, TMDB_READ_TOKEN: 'test-token'});
   assert.equal(result.status, 200);
