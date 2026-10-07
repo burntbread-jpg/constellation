@@ -365,6 +365,20 @@ test('public metadata is cacheable while personal data remains private', async (
   assert.equal(archiveResult.headers.get('cache-control'), 'no-store');
 });
 
+test('mutation guard rejects cross-origin and oversized requests', async () => {
+  const crossOrigin = await worker.fetch(new Request('https://site.test/api/archive', {
+    method: 'POST', headers: {...headers, origin: 'https://evil.example', 'content-type': 'application/json'}, body: '{}'
+  }), env);
+  assert.equal(crossOrigin.status, 403);
+  assert.deepEqual(await crossOrigin.json(), {error: '허용되지 않은 출처의 요청입니다.'});
+
+  const oversized = await worker.fetch(new Request('https://site.test/api/archive', {
+    method: 'POST', headers: {...headers, origin: 'https://site.test', 'content-type': 'application/json', 'content-length': '262145'}, body: '{}'
+  }), env);
+  assert.equal(oversized.status, 413);
+  assert.deepEqual(await oversized.json(), {error: '요청 데이터가 너무 큽니다.'});
+});
+
 test('artwork chooses a high resolution Korean official film poster', async () => {
   const result = await worker.fetch(new Request('https://site.test/api/artwork?title=%EA%B8%B0%EC%83%9D%EC%B6%A9&mediaType=FILM'), {...env, TMDB_READ_TOKEN: 'test-token'});
   assert.equal(result.status, 200);

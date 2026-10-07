@@ -181,6 +181,15 @@ function methodNotAllowed(allowed){
   return response;
 }
 
+function validateMutation(request,url){
+  if(!['POST','PATCH','DELETE'].includes(request.method))return null;
+  const origin=request.headers.get('origin');
+  if(origin&&origin!==url.origin)return json({error:'허용되지 않은 출처의 요청입니다.'},403);
+  const length=Number(request.headers.get('content-length')||0);
+  if(Number.isFinite(length)&&length>262144)return json({error:'요청 데이터가 너무 큽니다.'},413);
+  return null;
+}
+
 async function publicMetadata(response,maxAge){
   if(!response.ok)return response;
   const headers=new Headers(response.headers);
@@ -234,8 +243,9 @@ export default{
     const startedAt=performance.now(),id=requestId(request);
     try{
       const url=new URL(request.url);
+      const rejected=url.pathname.startsWith('/api/')?validateMutation(request,url):null;
       const response=url.pathname.startsWith('/api/')
-        ?await routeApi(request,env,url)
+        ?rejected||await routeApi(request,env,url)
         :env.ASSETS?await env.ASSETS.fetch(request):new Response('Not found',{status:404});
       return finishResponse(response,id,startedAt);
     }catch(error){
