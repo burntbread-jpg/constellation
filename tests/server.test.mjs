@@ -170,6 +170,14 @@ function mockSupabase(url, init = {}) {
     state.tags = state.tags.filter(tag => !(tag.user_id === filteredUserId && tag.work_id === workId));
     return response(null, 204);
   }
+  if (method === 'DELETE' && table === 'profiles') {
+    const deletedUserId = parsed.searchParams.get('id')?.replace(/^eq\./, '');
+    for (const [key, item] of state.archive) if (item.user_id === deletedUserId) state.archive.delete(key);
+    state.tags = state.tags.filter(tag => tag.user_id !== deletedUserId);
+    state.connections = state.connections.filter(row => row.user_id !== deletedUserId);
+    for (const [key, item] of state.feedback) if (item.user_id === deletedUserId) state.feedback.delete(key);
+    return response(null, 204);
+  }
   if (method === 'DELETE' && table === 'connections') {
     const value = key => parsed.searchParams.get(key)?.replace(/^eq\./, '');
     const user = value('user_id');
@@ -528,6 +536,36 @@ test('archive lifecycle creates Taste DNA, aggregates it, and deletes it', async
   assert.equal(state.tags.length, 0);
   assert.equal(state.connections.length, 1);
   assert.equal(state.connections[0].reason, 'unrelated');
+});
+
+test('account data deletion removes only the signed-in user personal data', async () => {
+  const otherUserId = '22222222-2222-4222-8222-222222222222';
+  state.works.set('shared:work', {id: 'shared:work', title: '공용 작품'});
+  state.archive.set(`${userId}:mine`, {user_id: userId, work_id: 'mine'});
+  state.archive.set(`${otherUserId}:theirs`, {user_id: otherUserId, work_id: 'theirs'});
+  state.tags.push({user_id: userId, work_id: 'mine', tag: '기억'}, {user_id: otherUserId, work_id: 'theirs', tag: '성장'});
+  state.connections.push({user_id: userId, from_work_id: 'mine'}, {user_id: otherUserId, from_work_id: 'theirs'});
+  state.feedback.set(`${userId}:mine:target:deep`, {user_id: userId});
+  state.feedback.set(`${otherUserId}:theirs:target:deep`, {user_id: otherUserId});
+
+  const wrongConfirmation = await worker.fetch(new Request('https://site.test/api/account-data', {
+    method: 'DELETE', headers: {...headers, 'content-type': 'application/json'},
+    body: JSON.stringify({confirmation: 'delete'})
+  }), env);
+  assert.equal(wrongConfirmation.status, 400);
+  assert.equal(state.archive.size, 2);
+
+  const result = await worker.fetch(new Request('https://site.test/api/account-data', {
+    method: 'DELETE', headers: {...headers, 'content-type': 'application/json'},
+    body: JSON.stringify({confirmation: 'DELETE'})
+  }), env);
+  assert.equal(result.status, 200);
+  assert.equal((await result.json()).deleted, true);
+  assert.equal([...state.archive.values()].every(item => item.user_id === otherUserId), true);
+  assert.equal(state.tags.every(item => item.user_id === otherUserId), true);
+  assert.equal(state.connections.every(item => item.user_id === otherUserId), true);
+  assert.equal([...state.feedback.values()].every(item => item.user_id === otherUserId), true);
+  assert.equal(state.works.has('shared:work'), true);
 });
 
 test('archive management updates review, status, and Taste DNA', async () => {

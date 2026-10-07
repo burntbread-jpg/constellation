@@ -38,6 +38,7 @@ async function routeApi(request,env,url){
   if(pathname==='/api/connections')return request.method==='GET'?connections(request,env):methodNotAllowed(['GET']);
   if(pathname==='/api/constellation')return request.method==='GET'?constellationMap(request,env):methodNotAllowed(['GET']);
   if(pathname==='/api/archive')return ['GET','POST'].includes(request.method)?archive(request,env):methodNotAllowed(['GET','POST']);
+  if(pathname==='/api/account-data')return request.method==='DELETE'?removeAccountData(request,env):methodNotAllowed(['DELETE']);
   if(pathname==='/api/taste-profile')return request.method==='GET'?tasteProfileV2(request,env):methodNotAllowed(['GET']);
   if(pathname==='/api/taste-similarities')return request.method==='GET'?tasteSimilarities(request,env):methodNotAllowed(['GET']);
   if(pathname.startsWith('/api/archive/')){
