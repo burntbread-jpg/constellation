@@ -1,4 +1,4 @@
-const CACHE='taste-constellation-shell-v51';
+const CACHE='taste-constellation-shell-v55';
 const SHELL=['/','/index.html','/styles.css','/live-search.css','/archive.css?v=51','/pwa.css?v=44','/accessibility.css?v=45','/app.js?v=51','/manifest.webmanifest','/icon.svg','/icon-192.png','/icon-512.png'];
 
 self.addEventListener('install',event=>{
