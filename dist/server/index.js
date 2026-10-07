@@ -181,12 +181,20 @@ function methodNotAllowed(allowed){
   return response;
 }
 
+async function publicMetadata(response,maxAge){
+  if(!response.ok)return response;
+  const headers=new Headers(response.headers);
+  headers.set('cache-control',`public, max-age=${maxAge}, stale-while-revalidate=${Math.max(60,maxAge*2)}`);
+  headers.set('vary','Accept-Encoding');
+  return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+}
+
 async function routeApi(request,env,url){
   const {pathname}=url;
-  if(pathname==='/api/search')return request.method==='GET'?search(request,env):methodNotAllowed(['GET']);
-  if(pathname==='/api/artwork')return request.method==='GET'?artwork(request,env):methodNotAllowed(['GET']);
-  if(pathname==='/api/cultural-context')return request.method==='GET'?culturalContext(request):methodNotAllowed(['GET']);
-  if(pathname==='/api/book-publishers')return request.method==='GET'?bookPublishers(request,env):methodNotAllowed(['GET']);
+  if(pathname==='/api/search')return request.method==='GET'?publicMetadata(await search(request,env),300):methodNotAllowed(['GET']);
+  if(pathname==='/api/artwork')return request.method==='GET'?publicMetadata(await artwork(request,env),86400):methodNotAllowed(['GET']);
+  if(pathname==='/api/cultural-context')return request.method==='GET'?publicMetadata(await culturalContext(request),86400):methodNotAllowed(['GET']);
+  if(pathname==='/api/book-publishers')return request.method==='GET'?publicMetadata(await bookPublishers(request,env),21600):methodNotAllowed(['GET']);
   if(pathname==='/api/editorial-intro')return request.method==='POST'?editorialIntro(request):methodNotAllowed(['POST']);
   if(pathname==='/api/recommendations')return request.method==='POST'?recommendationsV5(request,env):methodNotAllowed(['POST']);
   if(pathname==='/api/recommendation-feedback')return request.method==='POST'?recommendationFeedbackV2(request,env):methodNotAllowed(['POST']);

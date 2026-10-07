@@ -354,6 +354,17 @@ test('API routing distinguishes missing paths and unsupported methods', async ()
   assert.deepEqual(await unsupported.json(), {error: '지원하지 않는 요청 방식입니다.', allowed: ['GET']});
 });
 
+test('public metadata is cacheable while personal data remains private', async () => {
+  const searchResult = await worker.fetch(new Request('https://site.test/api/search?q=기억'), env);
+  assert.equal(searchResult.status, 200);
+  assert.equal(searchResult.headers.get('cache-control'), 'public, max-age=300, stale-while-revalidate=600');
+  assert.equal(searchResult.headers.get('vary'), 'Accept-Encoding');
+
+  const archiveResult = await worker.fetch(new Request('https://site.test/api/archive', {headers}), env);
+  assert.equal(archiveResult.status, 200);
+  assert.equal(archiveResult.headers.get('cache-control'), 'no-store');
+});
+
 test('artwork chooses a high resolution Korean official film poster', async () => {
   const result = await worker.fetch(new Request('https://site.test/api/artwork?title=%EA%B8%B0%EC%83%9D%EC%B6%A9&mediaType=FILM'), {...env, TMDB_READ_TOKEN: 'test-token'});
   assert.equal(result.status, 200);
