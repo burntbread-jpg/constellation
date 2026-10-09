@@ -15,7 +15,7 @@ $('#searchResults').onclick=e=>{const b=e.target.closest('[data-result]');if(b){
 $('#searchResults').onkeydown=e=>{const items=$$('#searchResults [data-result]'),index=items.indexOf(document.activeElement);if(e.key==='ArrowDown'&&items.length){e.preventDefault();items[(index+1)%items.length].focus()}if(e.key==='ArrowUp'&&items.length){e.preventDefault();items[(index-1+items.length)%items.length].focus()}};
 document.addEventListener('click',e=>{const retry=e.target.closest('[data-retry-archive]');if(retry){retry.disabled=true;retry.textContent='불러오는 중…';loadArchive();return}if(!e.target.closest('.search-wrap'))setSearchOpen(false)});
 document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();$('#searchInput').focus()}if(e.key==='Escape')setSearchOpen(false);if(e.key==='ArrowDown'&&document.activeElement===$('#searchInput')){const first=$('#searchResults [data-result]');if(first){e.preventDefault();first.focus()}}});
-$('#metadataReviewBtn').onclick=()=>loadMetadataReviewQueue(true);$('#metadataReviewList').onclick=e=>{const button=e.target.closest('[data-review-decision]');if(button)reviewMetadata(button)};
+$('#metadataReviewBtn').onclick=openMetadataReview;$('#metadataReviewList').onclick=e=>{const button=e.target.closest('[data-review-decision]');if(button)reviewMetadata(button)};$('#metadataChangeList').onclick=e=>{const button=e.target.closest('[data-rollback-change]');if(button)rollbackMetadata(button)};
 $('#archiveCount').textContent='…';renderWork();loadArchive();
 loadMetadataReviewQueue();
 enableAppShell();

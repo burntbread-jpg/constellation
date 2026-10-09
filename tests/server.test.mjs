@@ -23,6 +23,7 @@ const state = {
   connections: [],
   feedback: new Map(),
   metadataReports: [],
+  metadataChanges: [],
   catalogQueries: [],
   profileWrites: 0,
   backfillCalls: 0,
@@ -156,6 +157,22 @@ function mockSupabase(url, init = {}) {
     state.metadataReports = state.metadataReports.map(row => String(row.id) === id && (!status || row.status === status) ? {...row, ...body} : row);
     return response(null, 204);
   }
+  if (method === 'POST' && table === 'metadata_changes') {
+    const row = {...body, id: state.metadataChanges.length + 1, changed_at: '2026-10-09T00:00:00.000Z'};
+    state.metadataChanges.push(row);
+    return response([row], 201);
+  }
+  if (method === 'GET' && table === 'metadata_changes') {
+    const id = parsed.searchParams.get('id')?.replace(/^eq\./, '');
+    const status = parsed.searchParams.get('status')?.replace(/^eq\./, '');
+    return response(state.metadataChanges.filter(row => (!id || String(row.id) === id) && (!status || row.status === status)));
+  }
+  if (method === 'PATCH' && table === 'metadata_changes') {
+    const id = parsed.searchParams.get('id')?.replace(/^eq\./, '');
+    const status = parsed.searchParams.get('status')?.replace(/^eq\./, '');
+    state.metadataChanges = state.metadataChanges.map(row => String(row.id) === id && (!status || row.status === status) ? {...row, ...body} : row);
+    return response(null, 204);
+  }
   if (method === 'POST' && table === 'works') {
     state.works.set(body.id, body);
     return response(null, 204);
@@ -164,6 +181,10 @@ function mockSupabase(url, init = {}) {
     const id = parsed.searchParams.get('id')?.replace(/^eq\./, '');
     if (state.works.has(id)) state.works.set(id, {...state.works.get(id), ...body});
     return response(null, 204);
+  }
+  if (method === 'GET' && table === 'works') {
+    const id = parsed.searchParams.get('id')?.replace(/^eq\./, '');
+    return response(id && state.works.has(id) ? [state.works.get(id)] : []);
   }
   if (method === 'POST' && table === 'archive_items') {
     state.archive.set(`${body.user_id}:${body.work_id}`, body);
@@ -340,6 +361,7 @@ test.beforeEach(() => {
   state.connections = [];
   state.feedback.clear();
   state.metadataReports = [];
+  state.metadataChanges = [];
   state.profileWrites = 0;
   state.backfillCalls = 0;
   state.failProfiles = false;
@@ -592,6 +614,30 @@ test('metadata review queue is restricted and accepted corrections update shared
   assert.equal(state.archive.get(`${userId}:film:corrected`).work_json.release_year,1996);
   assert.equal(state.metadataReports[0].status,'accepted');
   assert.equal(state.metadataReports[0].reviewed_by,reviewerId);
+  assert.equal(state.metadataChanges[0].previous_value,1995);
+  assert.equal(state.metadataChanges[0].new_value,1996);
+  assert.equal(state.metadataChanges[0].status,'applied');
+});
+
+test('metadata change history is reviewer-only and rollback restores shared and archived values', async () => {
+  const reviewerId='44444444-4444-4444-8444-444444444444',reviewerHeaders={'oai-authenticated-user-id':reviewerId,'oai-authenticated-user-email':'reviewer@example.com'},reviewerEnv={...env,METADATA_REVIEWER_IDS:reviewerId};
+  state.works.set('film:history',{id:'film:history',title:'기록 작품',release_year:1996,media_type:'FILM'});
+  state.archive.set(`${userId}:film:history`,{user_id:userId,work_id:'film:history',work_json:{id:'film:history',title:'기록 작품',release_year:1996,media_type:'FILM'}});
+  state.metadataChanges.push({id:1,report_id:7,work_id:'film:history',work_title:'기록 작품',field_name:'release_year',previous_value:1995,new_value:1996,status:'applied',changed_by:reviewerId,changed_at:'2026-10-09T00:00:00.000Z'});
+  state.metadataChanges.push({id:2,report_id:6,work_id:'film:history',work_title:'기록 작품',field_name:'release_year',previous_value:1994,new_value:1997,status:'applied',changed_by:reviewerId,changed_at:'2026-10-08T00:00:00.000Z'});
+  const denied=await worker.fetch(new Request('https://site.test/api/metadata-changes',{headers:{'oai-authenticated-user-id':'33333333-3333-4333-8333-333333333333'}}),reviewerEnv);
+  assert.equal(denied.status,403);
+  const history=await worker.fetch(new Request('https://site.test/api/metadata-changes',{headers:reviewerHeaders}),reviewerEnv);
+  assert.equal(history.status,200);
+  assert.equal((await history.json()).count,2);
+  const stale=await worker.fetch(new Request('https://site.test/api/metadata-changes/2',{method:'PATCH',headers:{...reviewerHeaders,'content-type':'application/json'},body:'{}'}),reviewerEnv);
+  assert.equal(stale.status,409);
+  const rolledBack=await worker.fetch(new Request('https://site.test/api/metadata-changes/1',{method:'PATCH',headers:{...reviewerHeaders,'content-type':'application/json'},body:JSON.stringify({note:'원 출처 재확인'})}),reviewerEnv);
+  assert.equal(rolledBack.status,200);
+  assert.equal(state.works.get('film:history').release_year,1995);
+  assert.equal(state.archive.get(`${userId}:film:history`).work_json.release_year,1995);
+  assert.equal(state.metadataChanges[0].status,'rolled_back');
+  assert.equal(state.metadataChanges[0].rolled_back_by,reviewerId);
 });
 
 test('archive lifecycle creates Taste DNA, aggregates it, and deletes it', async () => {
