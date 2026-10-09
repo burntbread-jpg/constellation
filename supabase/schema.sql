@@ -5,6 +5,10 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+-- Sites authenticates visitors outside Supabase Auth. Keep application profiles
+-- independent so stable Sites identities can own private archive rows.
+alter table public.profiles drop constraint if exists profiles_id_fkey;
+
 create extension if not exists vector with schema extensions;
 
 create table if not exists public.works (
