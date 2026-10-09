@@ -683,6 +683,15 @@ test('external Sites user IDs map to a stable UUID and archive GET stays read-on
   assert.equal(state.profileWrites, 1);
 });
 
+test('Sites email-only authentication maps to a stable private UUID', async () => {
+  const emailOnly = {'oai-authenticated-user-email': 'email-only@example.com'};
+  const first = await worker.fetch(new Request('https://site.test/api/archive', {headers: emailOnly}), env);
+  const second = await worker.fetch(new Request('https://site.test/api/archive', {headers: emailOnly}), env);
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+  assert.equal(state.profileWrites, 0);
+});
+
 test('hostile media types are normalized and cannot trap Taste DNA generation', async () => {
   const result = await worker.fetch(new Request('https://site.test/api/archive', {
     method: 'POST',

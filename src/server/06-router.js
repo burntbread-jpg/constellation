@@ -38,7 +38,7 @@ function validateMutation(request,url){
 
 function rateLimit(request){
   const mutating=['POST','PATCH','DELETE'].includes(request.method),limit=mutating?30:180,windowMs=60000;
-  const identity=request.headers.get('oai-authenticated-user-id')||request.headers.get('cf-connecting-ip')||'anonymous';
+  const identity=request.headers.get('oai-authenticated-user-id')||request.headers.get('oai-authenticated-user-email')||request.headers.get('cf-connecting-ip')||'anonymous';
   const key=`${mutating?'write':'read'}:${identity}`,now=Date.now();
   let bucket=RATE_BUCKETS.get(key);
   if(!bucket||now-bucket.startedAt>=windowMs)bucket={startedAt:now,count:0};
