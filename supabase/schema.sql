@@ -50,6 +50,8 @@ create table if not exists public.metadata_reports (
   created_at timestamptz not null default now(),
   reviewed_at timestamptz
 );
+alter table public.metadata_reports add column if not exists resolution_note text;
+alter table public.metadata_reports add column if not exists reviewed_by text;
 create index if not exists metadata_reports_pending_idx on public.metadata_reports(status, created_at desc);
 alter table public.metadata_reports enable row level security;
 revoke all on public.metadata_reports from anon, authenticated;

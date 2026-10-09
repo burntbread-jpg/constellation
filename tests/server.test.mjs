@@ -145,8 +145,24 @@ function mockSupabase(url, init = {}) {
     state.metadataReports.push(row);
     return response([row], 201);
   }
+  if (method === 'GET' && table === 'metadata_reports') {
+    const status = parsed.searchParams.get('status')?.replace(/^eq\./, '');
+    const id = parsed.searchParams.get('id')?.replace(/^eq\./, '');
+    return response(state.metadataReports.filter(row => (!status || row.status === status) && (!id || String(row.id) === id)));
+  }
+  if (method === 'PATCH' && table === 'metadata_reports') {
+    const id = parsed.searchParams.get('id')?.replace(/^eq\./, '');
+    const status = parsed.searchParams.get('status')?.replace(/^eq\./, '');
+    state.metadataReports = state.metadataReports.map(row => String(row.id) === id && (!status || row.status === status) ? {...row, ...body} : row);
+    return response(null, 204);
+  }
   if (method === 'POST' && table === 'works') {
     state.works.set(body.id, body);
+    return response(null, 204);
+  }
+  if (method === 'PATCH' && table === 'works') {
+    const id = parsed.searchParams.get('id')?.replace(/^eq\./, '');
+    if (state.works.has(id)) state.works.set(id, {...state.works.get(id), ...body});
     return response(null, 204);
   }
   if (method === 'POST' && table === 'archive_items') {
@@ -196,7 +212,7 @@ function mockSupabase(url, init = {}) {
   if (method === 'GET' && table === 'archive_items') {
     const filteredUserId = parsed.searchParams.get('user_id')?.replace(/^eq\./, '');
     const filteredWorkId = parsed.searchParams.get('work_id')?.replace(/^eq\./, '');
-    return response([...state.archive.values()].filter(item => item.user_id === filteredUserId && (!filteredWorkId || item.work_id === filteredWorkId)).map(item => ({
+    return response([...state.archive.values()].filter(item => (!filteredUserId || item.user_id === filteredUserId) && (!filteredWorkId || item.work_id === filteredWorkId)).map(item => ({
       ...item,
       created_at: '2026-09-30T00:00:00.000Z',
       works: state.works.get(item.work_id)
@@ -557,6 +573,25 @@ test('metadata correction reports require login and stay pending for review', as
   assert.equal((await saved.json()).status,'pending');
   assert.equal(state.metadataReports[0].current_value,1995);
   assert.equal(state.metadataReports[0].suggested_value,'1996');
+});
+
+test('metadata review queue is restricted and accepted corrections update shared and archived metadata', async () => {
+  const reviewerId='44444444-4444-4444-8444-444444444444',reviewerHeaders={'oai-authenticated-user-id':reviewerId,'oai-authenticated-user-email':'reviewer@example.com'},reviewerEnv={...env,METADATA_REVIEWER_IDS:reviewerId};
+  state.works.set('film:corrected',{id:'film:corrected',title:'수정 전',release_year:1995,media_type:'FILM'});
+  state.archive.set(`${userId}:film:corrected`,{user_id:userId,work_id:'film:corrected',work_json:{id:'film:corrected',title:'수정 전',release_year:1995,media_type:'FILM'}});
+  state.metadataReports.push({id:1,user_id:'22222222-2222-4222-8222-222222222222',work_id:'film:corrected',work_title:'수정 전',issue_type:'year',current_value:'1995',suggested_value:'1996',note:'공식 자료',status:'pending'});
+  const denied=await worker.fetch(new Request('https://site.test/api/metadata-reports',{headers:{'oai-authenticated-user-id':'33333333-3333-4333-8333-333333333333'}}),reviewerEnv);
+  assert.equal(denied.status,403);
+  const queue=await worker.fetch(new Request('https://site.test/api/metadata-reports',{headers:reviewerHeaders}),reviewerEnv);
+  assert.equal(queue.status,200);
+  assert.equal((await queue.json()).count,1);
+  const reviewed=await worker.fetch(new Request('https://site.test/api/metadata-reports/1',{method:'PATCH',headers:{...reviewerHeaders,'content-type':'application/json'},body:JSON.stringify({decision:'accepted',resolutionNote:'검증 완료'})}),reviewerEnv);
+  assert.equal(reviewed.status,200);
+  assert.equal((await reviewed.json()).applied,true);
+  assert.equal(state.works.get('film:corrected').release_year,1996);
+  assert.equal(state.archive.get(`${userId}:film:corrected`).work_json.release_year,1996);
+  assert.equal(state.metadataReports[0].status,'accepted');
+  assert.equal(state.metadataReports[0].reviewed_by,reviewerId);
 });
 
 test('archive lifecycle creates Taste DNA, aggregates it, and deletes it', async () => {

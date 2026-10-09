@@ -136,7 +136,7 @@
       </section>
     </section>
   </main>
-  <footer class="site-footer"><a href="/privacy.html">개인정보 안내</a><span>취향 데이터는 사용자의 성좌를 만드는 데만 사용됩니다.</span></footer>
+  <footer class="site-footer"><a href="/privacy.html">개인정보 안내</a><button id="metadataReviewBtn" class="metadata-review-link" type="button" hidden>정보 검수 <span id="metadataReviewCount">0</span></button><span>취향 데이터는 사용자의 성좌를 만드는 데만 사용됩니다.</span></footer>
 
   <dialog id="saveDialog" class="taste-dialog" aria-labelledby="saveDialogTitle">
     <form id="saveForm" method="dialog">
@@ -184,7 +184,15 @@
       <button id="submitMetadataReport" class="analyze-save" value="default">수정 제안 보내기</button>
     </form>
   </dialog>
+  <dialog id="metadataReviewDialog" class="taste-dialog metadata-review-dialog" aria-labelledby="metadataReviewTitle">
+    <div>
+      <button class="dialog-close" type="button" aria-label="닫기" onclick="this.closest('dialog').close()">×</button>
+      <p class="eyebrow">METADATA REVIEW</p><h2 id="metadataReviewTitle">작품 정보 수정 제안</h2>
+      <p class="dialog-lead">승인하면 공용 작품 정보와 저장된 성좌의 메타데이터에 반영됩니다.</p>
+      <div id="metadataReviewList" class="metadata-review-list"></div>
+    </div>
+  </dialog>
   <div id="toast" class="toast" role="status"></div>
-  <script src="app.js?v=62"></script>
+  <script src="app.js?v=63"></script>
 </body>
 </html>
