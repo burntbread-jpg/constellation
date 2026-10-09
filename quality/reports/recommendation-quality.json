@@ -1,0 +1,251 @@
+{
+  "version": 1,
+  "dataset": "recommendation-eval-set-v1",
+  "thresholds": {
+    "minimumCases": 30,
+    "recommendationsPerScenario": 3,
+    "minimumScenarioPassRate": 0.95,
+    "minimumTagAlignment": 0.75,
+    "minimumCrossMediaRate": 0.8,
+    "minimumModeDifferentiation": 0.6,
+    "minimumEditorialQuality": 0.95,
+    "minimumPerCaseUniqueRate": 0.4
+  },
+  "metrics": {
+    "cases": 30,
+    "modes": 5,
+    "scenarios": 150,
+    "recommendations": 450,
+    "scenarioPassRate": 1,
+    "tagAlignment": 0.9311,
+    "crossMediaRate": 1,
+    "modeDifferentiation": 0.9,
+    "editorialQuality": 1,
+    "perCaseUniqueRate": 0.4356
+  },
+  "perMode": {
+    "story": {
+      "scenarios": 30,
+      "passRate": 1,
+      "tagAlignment": 0.8889,
+      "crossMediaRate": 1
+    },
+    "mood": {
+      "scenarios": 30,
+      "passRate": 1,
+      "tagAlignment": 0.8778,
+      "crossMediaRate": 1
+    },
+    "idea": {
+      "scenarios": 30,
+      "passRate": 1,
+      "tagAlignment": 0.9667,
+      "crossMediaRate": 1
+    },
+    "visual": {
+      "scenarios": 30,
+      "passRate": 1,
+      "tagAlignment": 0.9556,
+      "crossMediaRate": 1
+    },
+    "deep": {
+      "scenarios": 30,
+      "passRate": 1,
+      "tagAlignment": 0.9667,
+      "crossMediaRate": 1
+    }
+  },
+  "gates": {
+    "cases": true,
+    "scenarioPassRate": true,
+    "tagAlignment": true,
+    "crossMediaRate": true,
+    "modeDifferentiation": true,
+    "editorialQuality": true,
+    "perCaseUniqueRate": true
+  },
+  "passed": true,
+  "failures": [],
+  "cases": [
+    {
+      "id": "eval:anime:evangelion",
+      "title": "신세기 에반게리온",
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.4667
+    },
+    {
+      "id": "eval:film:persona",
+      "title": "퍼소나",
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.4667
+    },
+    {
+      "id": "eval:book:norwegian-wood",
+      "title": "노르웨이의 숲",
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.4667
+    },
+    {
+      "id": "eval:film:parasite",
+      "title": "기생충",
+      "modeDifferentiation": 0.8,
+      "uniqueRate": 0.4
+    },
+    {
+      "id": "eval:film:her",
+      "title": "Her",
+      "modeDifferentiation": 0.8,
+      "uniqueRate": 0.3333
+    },
+    {
+      "id": "eval:anime:lain",
+      "title": "Serial Experiments Lain",
+      "modeDifferentiation": 0.8,
+      "uniqueRate": 0.4667
+    },
+    {
+      "id": "eval:book:klara",
+      "title": "클라라와 태양",
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.4
+    },
+    {
+      "id": "eval:film:arrival",
+      "title": "컨택트",
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.4
+    },
+    {
+      "id": "eval:anime:ghost-shell",
+      "title": "공각기동대",
+      "modeDifferentiation": 0.6,
+      "uniqueRate": 0.4
+    },
+    {
+      "id": "eval:book:no-longer-human",
+      "title": "인간 실격",
+      "modeDifferentiation": 0.8,
+      "uniqueRate": 0.4
+    },
+    {
+      "id": "eval:film:melancholia",
+      "title": "멜랑콜리아",
+      "modeDifferentiation": 0.8,
+      "uniqueRate": 0.3333
+    },
+    {
+      "id": "eval:anime:angels-egg",
+      "title": "천사의 알",
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.5333
+    },
+    {
+      "id": "eval:book:childhoods-end",
+      "title": "유년기의 끝",
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.5333
+    },
+    {
+      "id": "eval:film:eternal-sunshine",
+      "title": "이터널 선샤인",
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.4667
+    },
+    {
+      "id": "eval:anime:gunbuster",
+      "title": "건버스터",
+      "modeDifferentiation": 0.8,
+      "uniqueRate": 0.4
+    },
+    {
+      "id": "eval:book:left-hand-darkness",
+      "title": "어둠의 왼손",
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.4
+    },
+    {
+      "id": "eval:film:2001",
+      "title": "2001 스페이스 오디세이",
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.4667
+    },
+    {
+      "id": "eval:book:never-let-me-go",
+      "title": "나를 보내지 마",
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.4
+    },
+    {
+      "id": "eval:film:synecdoche",
+      "title": "시네도키, 뉴욕",
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.6
+    },
+    {
+      "id": "eval:anime:perfect-blue",
+      "title": "퍼펙트 블루",
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.5333
+    },
+    {
+      "id": "eval:book:beloved",
+      "title": "빌러비드",
+      "modeDifferentiation": 0.8,
+      "uniqueRate": 0.4
+    },
+    {
+      "id": "eval:film:in-the-mood",
+      "title": "화양연화",
+      "modeDifferentiation": 0.6,
+      "uniqueRate": 0.3333
+    },
+    {
+      "id": "eval:manga:parasyte",
+      "title": "기생수",
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.6667
+    },
+    {
+      "id": "eval:anime:fullmetal",
+      "title": "강철의 연금술사",
+      "modeDifferentiation": 0.6,
+      "uniqueRate": 0.2
+    },
+    {
+      "id": "eval:book:midnights-children",
+      "title": "한밤의 아이들",
+      "modeDifferentiation": 0.8,
+      "uniqueRate": 0.3333
+    },
+    {
+      "id": "eval:film:stalker",
+      "title": "스토커",
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.4667
+    },
+    {
+      "id": "eval:anime:mononoke",
+      "title": "모노노케 히메",
+      "modeDifferentiation": 0.8,
+      "uniqueRate": 0.4
+    },
+    {
+      "id": "eval:book:frankenstein",
+      "title": "프랑켄슈타인",
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.4
+    },
+    {
+      "id": "eval:film:children-men",
+      "title": "칠드런 오브 맨",
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.6
+    },
+    {
+      "id": "eval:anime:paprika",
+      "title": "파프리카",
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.4
+    }
+  ]
+}

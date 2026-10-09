@@ -1,0 +1,10 @@
+{
+  "minimumCases": 30,
+  "recommendationsPerScenario": 3,
+  "minimumScenarioPassRate": 0.95,
+  "minimumTagAlignment": 0.75,
+  "minimumCrossMediaRate": 0.8,
+  "minimumModeDifferentiation": 0.6,
+  "minimumEditorialQuality": 0.95,
+  "minimumPerCaseUniqueRate": 0.4
+}

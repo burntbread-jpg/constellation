@@ -5,6 +5,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.mjs",
-    "check": "npm run build && npm test"
+    "check": "npm run build && npm test",
+    "eval:recommendations": "node scripts/evaluate-recommendations.mjs --write"
   }
 }
