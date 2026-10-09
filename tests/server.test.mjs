@@ -22,6 +22,7 @@ const state = {
   tags: [],
   connections: [],
   feedback: new Map(),
+  metadataReports: [],
   catalogQueries: [],
   profileWrites: 0,
   backfillCalls: 0,
@@ -139,6 +140,11 @@ function mockSupabase(url, init = {}) {
     state.feedback.set(`${body.user_id}:${body.from_work_id}:${body.to_work_id}:${body.connection_mode}`, body);
     return response(null, 204);
   }
+  if (method === 'POST' && table === 'metadata_reports') {
+    const row = {...body, id: state.metadataReports.length + 1};
+    state.metadataReports.push(row);
+    return response([row], 201);
+  }
   if (method === 'POST' && table === 'works') {
     state.works.set(body.id, body);
     return response(null, 204);
@@ -229,6 +235,15 @@ test.before(() => {
       if (query === '멜랑콜리아') return response({results: []});
       return response({results: [{id: 496243, poster_path: '/default.jpg'}]});
     }
+    if (url.startsWith('https://api.themoviedb.org/3/search/multi')) {
+      const query = new URL(url).searchParams.get('query');
+      if (query === '동일 제목') return response({results: [
+        {id: 10, media_type: 'movie', title: '동일 제목', original_title: 'Same Title', release_date: '1995-01-01', overview: '원작'},
+        {id: 20, media_type: 'movie', title: '동일 제목', original_title: 'Same Title', release_date: '2015-01-01', overview: '리메이크'},
+        {id: 30, media_type: 'tv', name: '동일 제목', original_name: 'Same Title', first_air_date: '2015-01-01', overview: 'TV판'}
+      ]});
+      return response({results: []});
+    }
     if (url.startsWith('https://api.themoviedb.org/3/movie/496243/images')) {
       return response({posters: [
         {file_path: '/english.jpg', iso_639_1: 'en', height: 1500, vote_average: 9, vote_count: 100},
@@ -308,6 +323,7 @@ test.beforeEach(() => {
   state.tags = [];
   state.connections = [];
   state.feedback.clear();
+  state.metadataReports = [];
   state.profileWrites = 0;
   state.backfillCalls = 0;
   state.failProfiles = false;
@@ -520,6 +536,27 @@ test('search groups complete and limited manga editions without title-specific r
   assert.equal(data.items[0].posterUrl, 'https://upload.wikimedia.org/fma-volume-1.jpg');
   assert.equal(data.items[0].artworkSource, 'Wikipedia');
   assert.equal(data.items.some(item => item.title.includes('4컷')), false);
+});
+
+test('identity keeps remakes and media adaptations separate while exposing stable keys', async () => {
+  const result = await worker.fetch(new Request('https://site.test/api/search?q=%EB%8F%99%EC%9D%BC%20%EC%A0%9C%EB%AA%A9'), {...env, TMDB_READ_TOKEN: 'test-token'});
+  assert.equal(result.status, 200);
+  const items = (await result.json()).items.filter(item => item.source === 'TMDB');
+  assert.deepEqual(items.map(item => [item.mediaType, item.year]), [['FILM', '1995'], ['FILM', '2015'], ['TV', '2015']]);
+  assert.equal(new Set(items.map(item => item.canonicalKey)).size, 3);
+  assert.ok(items.every(item => item.identityAliases.includes('sametitle')));
+});
+
+test('metadata correction reports require login and stay pending for review', async () => {
+  const body = JSON.stringify({work:{id:'tmdb:movie:10',title:'동일 제목',year:1995,mediaType:'FILM'},issueType:'year',suggestedValue:'1996',note:'공식 자료 확인'});
+  const anonymous = await worker.fetch(new Request('https://site.test/api/metadata-reports',{method:'POST',headers:{'content-type':'application/json'},body}),env);
+  assert.equal(anonymous.status,401);
+  const reportHeaders = {'oai-authenticated-user-id':'22222222-2222-4222-8222-222222222222','oai-authenticated-user-email':'reporter@example.com','content-type':'application/json'};
+  const saved = await worker.fetch(new Request('https://site.test/api/metadata-reports',{method:'POST',headers:reportHeaders,body}),env);
+  assert.equal(saved.status,201);
+  assert.equal((await saved.json()).status,'pending');
+  assert.equal(state.metadataReports[0].current_value,1995);
+  assert.equal(state.metadataReports[0].suggested_value,'1996');
 });
 
 test('archive lifecycle creates Taste DNA, aggregates it, and deletes it', async () => {

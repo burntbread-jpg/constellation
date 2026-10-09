@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="archive.css?v=51" />
   <link rel="stylesheet" href="pwa.css?v=44" />
   <link rel="stylesheet" href="accessibility.css?v=45" />
+  <link rel="stylesheet" href="metadata.css?v=62" />
 </head>
 <body>
   <a class="skip-link" href="#mainContent">본문으로 건너뛰기</a>
@@ -66,6 +67,7 @@
               <p id="cultureContext"></p>
               <div id="awardContext" class="award-context"></div>
               <div id="publisherContext" class="publisher-context" hidden></div>
+              <button id="reportMetadataBtn" class="metadata-report-btn" type="button">포스터·연도·창작자 정보 수정 제안</button>
             </div>
           </div>
           <button id="saveBtn" class="save-btn"><span>＋</span> 내 성좌에 담기</button>
@@ -171,7 +173,18 @@
       <button id="updateArchiveBtn" class="analyze-save" value="default">수정 내용 저장</button>
     </form>
   </dialog>
+  <dialog id="metadataReportDialog" class="taste-dialog" aria-labelledby="metadataReportTitle">
+    <form id="metadataReportForm" method="dialog">
+      <button class="dialog-close" type="button" aria-label="닫기" onclick="this.closest('dialog').close()">×</button>
+      <p class="eyebrow">METADATA CHECK</p><h2 id="metadataReportTitle">작품 정보 오류 신고</h2>
+      <p class="dialog-lead">제안은 검토 대기 상태로 저장되며 작품 정보를 즉시 덮어쓰지 않습니다.</p>
+      <label class="edit-field">잘못된 정보<select id="metadataIssueType"><option value="poster">포스터·표지</option><option value="year">발표 연도</option><option value="creator">창작자</option><option value="title">작품 제목</option><option value="media_type">매체 구분</option><option value="other">기타</option></select></label>
+      <label class="comment-field">올바른 정보<textarea id="metadataSuggestedValue" maxlength="1000" rows="2" placeholder="정확한 값이나 공식 이미지 주소를 적어 주세요."></textarea></label>
+      <label class="comment-field">근거·설명<textarea id="metadataReportNote" maxlength="2000" rows="3" placeholder="확인할 수 있는 출처나 이유가 있다면 함께 적어 주세요."></textarea></label>
+      <button id="submitMetadataReport" class="analyze-save" value="default">수정 제안 보내기</button>
+    </form>
+  </dialog>
   <div id="toast" class="toast" role="status"></div>
-  <script src="app.js?v=60"></script>
+  <script src="app.js?v=62"></script>
 </body>
 </html>

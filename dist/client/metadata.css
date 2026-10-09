@@ -1,0 +1,12 @@
+.metadata-report-btn {
+  margin-top: 14px;
+  border: 0;
+  background: none;
+  color: #777b84;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 0;
+  font: 11px 'Noto Sans KR', sans-serif;
+  cursor: pointer;
+}
+.metadata-report-btn:hover { color: var(--ink); }

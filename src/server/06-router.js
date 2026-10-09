@@ -65,6 +65,7 @@ async function routeApi(request,env,url){
   if(pathname==='/api/cultural-context')return request.method==='GET'?publicMetadata(await culturalContext(request),86400):methodNotAllowed(['GET']);
   if(pathname==='/api/book-publishers')return request.method==='GET'?publicMetadata(await bookPublishers(request,env),21600):methodNotAllowed(['GET']);
   if(pathname==='/api/editorial-intro')return request.method==='POST'?editorialIntro(request):methodNotAllowed(['POST']);
+  if(pathname==='/api/metadata-reports')return request.method==='POST'?metadataReport(request,env):methodNotAllowed(['POST']);
   if(pathname==='/api/recommendations')return request.method==='POST'?recommendationsV5(request,env):methodNotAllowed(['POST']);
   if(pathname==='/api/recommendation-feedback')return request.method==='POST'?recommendationFeedbackV2(request,env):methodNotAllowed(['POST']);
   if(pathname==='/api/connections')return request.method==='GET'?connections(request,env):methodNotAllowed(['GET']);
