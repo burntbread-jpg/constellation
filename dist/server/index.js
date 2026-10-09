@@ -264,7 +264,11 @@ export default{
         :env.ASSETS?await env.ASSETS.fetch(request):new Response('Not found',{status:404});
       return finishResponse(response,id,startedAt);
     }catch(error){
-      console.error('Request failed',{requestId:id,error});
+      console.error('Request failed',{
+        requestId:id,
+        message:error instanceof Error?error.message:String(error),
+        stack:error instanceof Error?error.stack:undefined
+      });
       return finishResponse(json({error:'요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.',requestId:id},500),id,startedAt);
     }
   }

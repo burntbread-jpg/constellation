@@ -307,10 +307,11 @@ begin
     where user_id = (p_item->>'user_id')::uuid and work_id = p_item->>'work_id';
 
   insert into public.taste_tags (user_id, work_id, tag, category, score, evidence, engine)
-  select distinct on (item->>'id')
+  select distinct on (tag->>'tag')
     (tag->>'user_id')::uuid, tag->>'work_id', tag->>'tag', tag->>'category',
     (tag->>'score')::double precision, tag->>'evidence', tag->>'engine'
-  from jsonb_array_elements(p_tags) as tag;
+  from jsonb_array_elements(p_tags) as tag
+  order by tag->>'tag';
 end;
 $$;
 

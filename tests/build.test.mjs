@@ -16,3 +16,12 @@ test('server deployment artifact matches the modular source', async () => {
   const deployed = await readFile(new URL('../dist/server/index.js', import.meta.url), 'utf8');
   assert.equal(normalize(deployed), normalize(generated));
 });
+
+test('archive analysis SQL deduplicates taste tags with the declared alias', async () => {
+  const schema = await readFile(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
+  const migration = await readFile(new URL('../supabase/migrations/20261009_fix_save_archive_analysis.sql', import.meta.url), 'utf8');
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /select distinct on \(tag->>'tag'\)/);
+    assert.doesNotMatch(sql, /select distinct on \(item->>'id'\)/);
+  }
+});
