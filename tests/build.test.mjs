@@ -41,3 +41,12 @@ test('archive library displays the editorial Bridge Score instead of graph centr
   assert.match(source, /<small>Bridge \$\{archiveBridgeScore\(work\)\}<\/small>/);
   assert.doesNotMatch(source, /archiveBridgeScore\(work\.id\)\*100/);
 });
+
+test('PWA shell and HTML request the same current client bundle', async () => {
+  const html = await readFile(new URL('../dist/client/index.html', import.meta.url), 'utf8');
+  const worker = await readFile(new URL('../dist/client/service-worker.js', import.meta.url), 'utf8');
+  const version = html.match(/app\.js\?v=(\d+)/)?.[1];
+  assert.ok(version);
+  assert.match(worker, new RegExp(`app\\.js\\?v=${version}`));
+  assert.match(worker, new RegExp(`taste-constellation-shell-v${version}`));
+});
