@@ -37,6 +37,7 @@ test('Sites identities are not constrained to Supabase Auth users', async () => 
 test('archive library displays the editorial Bridge Score instead of graph centrality', async () => {
   const source = await readFile(new URL('../src/client/03-archive.js', import.meta.url), 'utf8');
   assert.match(source, /return work\?bridgeProfile\(work\)\.score:0/);
-  assert.match(source, /<small>Bridge \$\{archiveBridgeScore\(work\.id\)\}<\/small>/);
+  assert.match(source, /typeof workOrId==='object'/);
+  assert.match(source, /<small>Bridge \$\{archiveBridgeScore\(work\)\}<\/small>/);
   assert.doesNotMatch(source, /archiveBridgeScore\(work\.id\)\*100/);
 });
