@@ -161,7 +161,8 @@ function mockSupabase(url, init = {}) {
     return response(null, 204);
   }
   if (method === 'POST' && table === 'metadata_changes') {
-    const row = {...body, id: state.metadataChanges.length + 1, changed_at: '2026-10-09T00:00:00.000Z'};
+    const report = state.metadataReports.find(item => String(item.id) === String(body.report_id));
+    const row = {...body, evidence_type: report?.evidence_type || null, source_url: report?.source_url || null, id: state.metadataChanges.length + 1, changed_at: '2026-10-09T00:00:00.000Z'};
     state.metadataChanges.push(row);
     return response([row], 201);
   }
@@ -308,6 +309,7 @@ test.before(() => {
         {id: 'ordinary', volumeInfo: {title: '기억의 책', authors: ['작가'], language: 'ko', publisher: '일반출판사', imageLinks: {thumbnail: 'http://books.test/ordinary.jpg'}}},
         {id: 'literary', volumeInfo: {title: '기억의 책', authors: ['작가'], language: 'ko', publisher: '민음사', industryIdentifiers: [{type: 'ISBN_13', identifier: '9780000000001'}], imageLinks: {large: 'http://books.test/literary.jpg?zoom=1'}}},
         {id: 'web-novel', volumeInfo: {title: '기억의 웹소설', authors: ['작가'], language: 'ko', publisher: '가상출판사', categories: ['웹소설'], imageLinks: {large: 'http://books.test/web-novel.jpg'}}},
+        {id: 'study-book', volumeInfo: {title: '서울대 교수와 함께하는 10대를 위한 교양 수업 7', authors: ['홍성욱'], language: 'ko', publisher: '올리볼로', publishedDate: '2024', categories: ['Juvenile Nonfiction'], imageLinks: {large: 'http://books.test/study-book.jpg'}}},
         {id: 'no-publisher', volumeInfo: {title: '출판 정보 없는 책', authors: ['작가'], language: 'ko', imageLinks: {large: 'http://books.test/no-publisher.jpg'}}}
       ]});
     }
@@ -543,16 +545,17 @@ test('search combines free Open Library and AniList results without paid keys', 
   assert.deepEqual(data.items.map(item => item.source).sort(), ['AniList', 'Open Library']);
 });
 
-test('book search excludes web novels and records without a published edition', async () => {
+test('book search excludes web novels, study books, and records without a published edition', async () => {
   const result = await worker.fetch(new Request('https://site.test/api/search?q=기억'), env);
   assert.equal(result.status, 200);
   const data = await result.json();
-  assert.equal(data.bookPolicy, 'published-editions-only');
+  assert.equal(data.bookPolicy, 'published-general-reading-only');
   const books = data.items.filter(item => item.mediaType === 'BOOK');
   assert.ok(books.length > 0);
   assert.ok(books.every(item => item.publishers.length > 0));
   assert.ok(books.every(item => !/웹\s*소설|web\s*novel/iu.test(`${item.title} ${(item.tags || []).join(' ')}`)));
   assert.ok(!state.works.has('googlebooks:web-novel'));
+  assert.ok(!state.works.has('googlebooks:study-book'));
   assert.ok(!state.works.has('googlebooks:no-publisher'));
 });
 
@@ -589,7 +592,7 @@ test('identity keeps remakes and media adaptations separate while exposing stabl
 });
 
 test('metadata correction reports require login and stay pending for review', async () => {
-  const body = JSON.stringify({work:{id:'tmdb:movie:10',title:'동일 제목',year:1995,mediaType:'FILM'},issueType:'year',suggestedValue:'1996',note:'공식 자료 확인'});
+  const body = JSON.stringify({work:{id:'tmdb:movie:10',title:'동일 제목',year:1995,mediaType:'FILM'},issueType:'year',suggestedValue:'1996',evidenceType:'official',sourceUrl:'https://studio.example/work/10',note:'공식 자료 확인'});
   const anonymous = await worker.fetch(new Request('https://site.test/api/metadata-reports',{method:'POST',headers:{'content-type':'application/json'},body}),env);
   assert.equal(anonymous.status,401);
   const reportHeaders = {'oai-authenticated-user-id':'22222222-2222-4222-8222-222222222222','oai-authenticated-user-email':'reporter@example.com','content-type':'application/json'};
@@ -598,6 +601,10 @@ test('metadata correction reports require login and stay pending for review', as
   assert.equal((await saved.json()).status,'pending');
   assert.equal(state.metadataReports[0].current_value,1995);
   assert.equal(state.metadataReports[0].suggested_value,'1996');
+  assert.equal(state.metadataReports[0].evidence_type,'official');
+  assert.equal(state.metadataReports[0].source_url,'https://studio.example/work/10');
+  const invalid = await worker.fetch(new Request('https://site.test/api/metadata-reports',{method:'POST',headers:reportHeaders,body:JSON.stringify({work:{id:'film:unsafe',title:'위험한 주소',mediaType:'FILM'},issueType:'year',suggestedValue:'2000',sourceUrl:'javascript:alert(1)'})}),env);
+  assert.equal(invalid.status,400);
 });
 
 test('repeated pending reports are deduplicated and can update the existing proposal', async () => {
@@ -633,7 +640,7 @@ test('metadata review queue is restricted and accepted corrections update shared
   const reviewerId='44444444-4444-4444-8444-444444444444',reviewerHeaders={'oai-authenticated-user-id':reviewerId,'oai-authenticated-user-email':'reviewer@example.com'},reviewerEnv={...env,METADATA_REVIEWER_IDS:reviewerId};
   state.works.set('film:corrected',{id:'film:corrected',title:'수정 전',release_year:1995,media_type:'FILM'});
   state.archive.set(`${userId}:film:corrected`,{user_id:userId,work_id:'film:corrected',work_json:{id:'film:corrected',title:'수정 전',release_year:1995,media_type:'FILM'}});
-  state.metadataReports.push({id:1,user_id:'22222222-2222-4222-8222-222222222222',work_id:'film:corrected',work_title:'수정 전',issue_type:'year',current_value:'1995',suggested_value:'1996',note:'공식 자료',status:'pending'});
+  state.metadataReports.push({id:1,user_id:'22222222-2222-4222-8222-222222222222',work_id:'film:corrected',work_title:'수정 전',issue_type:'year',current_value:'1995',suggested_value:'1996',note:'공식 자료',evidence_type:'authority_database',source_url:'https://catalog.example/film/corrected',status:'pending'});
   const denied=await worker.fetch(new Request('https://site.test/api/metadata-reports',{headers:{'oai-authenticated-user-id':'33333333-3333-4333-8333-333333333333'}}),reviewerEnv);
   assert.equal(denied.status,403);
   const queue=await worker.fetch(new Request('https://site.test/api/metadata-reports',{headers:reviewerHeaders}),reviewerEnv);
@@ -649,6 +656,8 @@ test('metadata review queue is restricted and accepted corrections update shared
   assert.equal(state.metadataChanges[0].previous_value,1995);
   assert.equal(state.metadataChanges[0].new_value,1996);
   assert.equal(state.metadataChanges[0].status,'applied');
+  assert.equal(state.metadataChanges[0].evidence_type,'authority_database');
+  assert.equal(state.metadataChanges[0].source_url,'https://catalog.example/film/corrected');
 });
 
 test('metadata review groups conflicting proposals and resolves related reports together', async () => {

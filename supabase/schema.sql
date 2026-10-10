@@ -52,6 +52,8 @@ create table if not exists public.metadata_reports (
 );
 alter table public.metadata_reports add column if not exists resolution_note text;
 alter table public.metadata_reports add column if not exists reviewed_by text;
+alter table public.metadata_reports add column if not exists evidence_type text check (evidence_type in ('official','publisher','award_body','authority_database','reference','other'));
+alter table public.metadata_reports add column if not exists source_url text;
 create index if not exists metadata_reports_pending_idx on public.metadata_reports(status, created_at desc);
 alter table public.metadata_reports enable row level security;
 revoke all on public.metadata_reports from anon, authenticated;
@@ -72,6 +74,21 @@ create table if not exists public.metadata_changes (
   rolled_back_at timestamptz,
   rollback_note text
 );
+alter table public.metadata_changes add column if not exists evidence_type text check (evidence_type in ('official','publisher','award_body','authority_database','reference','other'));
+alter table public.metadata_changes add column if not exists source_url text;
+create or replace function public.fill_metadata_change_provenance()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if new.report_id is not null then
+    select evidence_type, source_url into new.evidence_type, new.source_url
+    from public.metadata_reports where id = new.report_id;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists metadata_change_provenance on public.metadata_changes;
+create trigger metadata_change_provenance before insert on public.metadata_changes
+for each row execute function public.fill_metadata_change_provenance();
 create index if not exists metadata_changes_work_idx on public.metadata_changes(work_id, changed_at desc);
 alter table public.metadata_changes enable row level security;
 revoke all on public.metadata_changes from anon, authenticated;
