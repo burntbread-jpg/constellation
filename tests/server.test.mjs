@@ -150,7 +150,9 @@ function mockSupabase(url, init = {}) {
     const status = parsed.searchParams.get('status')?.replace(/^eq\./, '');
     const id = parsed.searchParams.get('id')?.replace(/^eq\./, '');
     const filteredUserId = parsed.searchParams.get('user_id')?.replace(/^eq\./, '');
-    return response(state.metadataReports.filter(row => (!status || row.status === status) && (!id || String(row.id) === id) && (!filteredUserId || row.user_id === filteredUserId)));
+    const workId = parsed.searchParams.get('work_id')?.replace(/^eq\./, '');
+    const issueType = parsed.searchParams.get('issue_type')?.replace(/^eq\./, '');
+    return response(state.metadataReports.filter(row => (!status || row.status === status) && (!id || String(row.id) === id) && (!filteredUserId || row.user_id === filteredUserId) && (!workId || row.work_id === workId) && (!issueType || row.issue_type === issueType)));
   }
   if (method === 'PATCH' && table === 'metadata_reports') {
     const id = parsed.searchParams.get('id')?.replace(/^eq\./, '');
@@ -598,6 +600,21 @@ test('metadata correction reports require login and stay pending for review', as
   assert.equal(state.metadataReports[0].suggested_value,'1996');
 });
 
+test('repeated pending reports are deduplicated and can update the existing proposal', async () => {
+  const reportHeaders = {'oai-authenticated-user-id':'55555555-5555-4555-8555-555555555555','oai-authenticated-user-email':'dedupe@example.com','content-type':'application/json'};
+  const requestBody = suggestedValue => JSON.stringify({work:{id:'film:dedupe',title:'중복 작품',year:1995,mediaType:'FILM'},issueType:'year',suggestedValue,note:'공식 자료'});
+  const first = await worker.fetch(new Request('https://site.test/api/metadata-reports',{method:'POST',headers:reportHeaders,body:requestBody('1996')}),env);
+  assert.equal(first.status,201);
+  const duplicate = await worker.fetch(new Request('https://site.test/api/metadata-reports',{method:'POST',headers:reportHeaders,body:requestBody('1996')}),env);
+  assert.equal(duplicate.status,200);
+  assert.equal((await duplicate.json()).duplicate,true);
+  const updated = await worker.fetch(new Request('https://site.test/api/metadata-reports',{method:'POST',headers:reportHeaders,body:requestBody('1997')}),env);
+  assert.equal(updated.status,200);
+  assert.equal((await updated.json()).updated,true);
+  assert.equal(state.metadataReports.length,1);
+  assert.equal(state.metadataReports[0].suggested_value,'1997');
+});
+
 test('reporters can read only their own metadata correction status and reviewer response', async () => {
   state.metadataReports.push({id:1,user_id:userId,work_id:'film:mine',work_title:'내 신고 작품',issue_type:'year',suggested_value:'2001',status:'accepted',resolution_note:'공식 연도 확인',created_at:'2026-10-09T00:00:00.000Z',reviewed_at:'2026-10-10T00:00:00.000Z'});
   state.metadataReports.push({id:2,user_id:'22222222-2222-4222-8222-222222222222',work_id:'film:other',work_title:'다른 사용자 작품',issue_type:'title',suggested_value:'비공개',status:'rejected',resolution_note:'다른 사용자 답변',created_at:'2026-10-09T00:00:00.000Z'});
@@ -632,6 +649,25 @@ test('metadata review queue is restricted and accepted corrections update shared
   assert.equal(state.metadataChanges[0].previous_value,1995);
   assert.equal(state.metadataChanges[0].new_value,1996);
   assert.equal(state.metadataChanges[0].status,'applied');
+});
+
+test('metadata review groups conflicting proposals and resolves related reports together', async () => {
+  const reviewerId='44444444-4444-4444-8444-444444444444',reviewerHeaders={'oai-authenticated-user-id':reviewerId,'oai-authenticated-user-email':'reviewer@example.com'},reviewerEnv={...env,METADATA_REVIEWER_IDS:reviewerId};
+  state.works.set('film:conflict',{id:'film:conflict',title:'충돌 작품',release_year:1995,media_type:'FILM'});
+  state.metadataReports.push(
+    {id:1,user_id:userId,work_id:'film:conflict',work_title:'충돌 작품',issue_type:'year',current_value:'1995',suggested_value:'1996',status:'pending'},
+    {id:2,user_id:'22222222-2222-4222-8222-222222222222',work_id:'film:conflict',work_title:'충돌 작품',issue_type:'year',current_value:'1995',suggested_value:'1996',status:'pending'},
+    {id:3,user_id:'33333333-3333-4333-8333-333333333333',work_id:'film:conflict',work_title:'충돌 작품',issue_type:'year',current_value:'1995',suggested_value:'1997',status:'pending'}
+  );
+  const queue=await worker.fetch(new Request('https://site.test/api/metadata-reports',{headers:reviewerHeaders}),reviewerEnv),queueData=await queue.json();
+  assert.equal(queueData.groupCount,1);
+  assert.equal(queueData.conflictCount,1);
+  assert.ok(queueData.items.every(item=>item.related_count===3&&item.alternative_count===2));
+  const reviewed=await worker.fetch(new Request('https://site.test/api/metadata-reports/1',{method:'PATCH',headers:{...reviewerHeaders,'content-type':'application/json'},body:JSON.stringify({decision:'accepted',resolutionNote:'공식 연도 확인'})}),reviewerEnv),reviewedData=await reviewed.json();
+  assert.equal(reviewedData.relatedResolved,2);
+  assert.deepEqual(state.metadataReports.map(item=>item.status),['accepted','accepted','rejected']);
+  assert.match(state.metadataReports[1].resolution_note,/함께 반영/);
+  assert.match(state.metadataReports[2].resolution_note,/다른 수정안/);
 });
 
 test('metadata change history is reviewer-only and rollback restores shared and archived values', async () => {
