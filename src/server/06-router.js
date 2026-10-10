@@ -66,6 +66,7 @@ async function routeApi(request,env,url){
   if(pathname==='/api/book-publishers')return request.method==='GET'?publicMetadata(await bookPublishers(request,env),21600):methodNotAllowed(['GET']);
   if(pathname==='/api/editorial-intro')return request.method==='POST'?editorialIntro(request):methodNotAllowed(['POST']);
   if(pathname==='/api/metadata-reports')return request.method==='POST'?metadataReport(request,env):request.method==='GET'?metadataReportQueue(request,env):methodNotAllowed(['GET','POST']);
+  if(pathname==='/api/my-metadata-reports')return request.method==='GET'?myMetadataReports(request,env):methodNotAllowed(['GET']);
   if(pathname.startsWith('/api/metadata-reports/')){const id=pathname.slice('/api/metadata-reports/'.length);return request.method==='PATCH'?reviewMetadataReport(request,env,id):methodNotAllowed(['PATCH'])}
   if(pathname==='/api/metadata-changes')return request.method==='GET'?metadataChangeHistory(request,env):methodNotAllowed(['GET']);
   if(pathname.startsWith('/api/metadata-changes/')){const id=pathname.slice('/api/metadata-changes/'.length);return request.method==='PATCH'?rollbackMetadataChange(request,env,id):methodNotAllowed(['PATCH'])}

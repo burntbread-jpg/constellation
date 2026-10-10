@@ -149,7 +149,8 @@ function mockSupabase(url, init = {}) {
   if (method === 'GET' && table === 'metadata_reports') {
     const status = parsed.searchParams.get('status')?.replace(/^eq\./, '');
     const id = parsed.searchParams.get('id')?.replace(/^eq\./, '');
-    return response(state.metadataReports.filter(row => (!status || row.status === status) && (!id || String(row.id) === id)));
+    const filteredUserId = parsed.searchParams.get('user_id')?.replace(/^eq\./, '');
+    return response(state.metadataReports.filter(row => (!status || row.status === status) && (!id || String(row.id) === id) && (!filteredUserId || row.user_id === filteredUserId)));
   }
   if (method === 'PATCH' && table === 'metadata_reports') {
     const id = parsed.searchParams.get('id')?.replace(/^eq\./, '');
@@ -595,6 +596,20 @@ test('metadata correction reports require login and stay pending for review', as
   assert.equal((await saved.json()).status,'pending');
   assert.equal(state.metadataReports[0].current_value,1995);
   assert.equal(state.metadataReports[0].suggested_value,'1996');
+});
+
+test('reporters can read only their own metadata correction status and reviewer response', async () => {
+  state.metadataReports.push({id:1,user_id:userId,work_id:'film:mine',work_title:'내 신고 작품',issue_type:'year',suggested_value:'2001',status:'accepted',resolution_note:'공식 연도 확인',created_at:'2026-10-09T00:00:00.000Z',reviewed_at:'2026-10-10T00:00:00.000Z'});
+  state.metadataReports.push({id:2,user_id:'22222222-2222-4222-8222-222222222222',work_id:'film:other',work_title:'다른 사용자 작품',issue_type:'title',suggested_value:'비공개',status:'rejected',resolution_note:'다른 사용자 답변',created_at:'2026-10-09T00:00:00.000Z'});
+  const anonymous=await worker.fetch(new Request('https://site.test/api/my-metadata-reports'),env);
+  assert.equal(anonymous.status,401);
+  const result=await worker.fetch(new Request('https://site.test/api/my-metadata-reports',{headers}),env);
+  assert.equal(result.status,200);
+  const data=await result.json();
+  assert.equal(data.count,1);
+  assert.equal(data.items[0].work_title,'내 신고 작품');
+  assert.equal(data.items[0].resolution_note,'공식 연도 확인');
+  assert.equal(JSON.stringify(data).includes('다른 사용자'),false);
 });
 
 test('metadata review queue is restricted and accepted corrections update shared and archived metadata', async () => {

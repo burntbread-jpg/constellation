@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="archive.css?v=51" />
   <link rel="stylesheet" href="pwa.css?v=44" />
   <link rel="stylesheet" href="accessibility.css?v=45" />
-  <link rel="stylesheet" href="metadata.css?v=64" />
+  <link rel="stylesheet" href="metadata.css?v=65" />
 </head>
 <body>
   <a class="skip-link" href="#mainContent">본문으로 건너뛰기</a>
@@ -182,6 +182,7 @@
       <label class="comment-field">올바른 정보<textarea id="metadataSuggestedValue" maxlength="1000" rows="2" placeholder="정확한 값이나 공식 이미지 주소를 적어 주세요."></textarea></label>
       <label class="comment-field">근거·설명<textarea id="metadataReportNote" maxlength="2000" rows="3" placeholder="확인할 수 있는 출처나 이유가 있다면 함께 적어 주세요."></textarea></label>
       <button id="submitMetadataReport" class="analyze-save" value="default">수정 제안 보내기</button>
+      <section class="my-metadata-reports" aria-labelledby="myMetadataReportsTitle"><h3 id="myMetadataReportsTitle">내 수정 제안</h3><div id="myMetadataReports"><p class="review-empty">처리 내역을 불러오고 있어요.</p></div></section>
     </form>
   </dialog>
   <dialog id="metadataReviewDialog" class="taste-dialog metadata-review-dialog" aria-labelledby="metadataReviewTitle">
@@ -197,6 +198,6 @@
     </div>
   </dialog>
   <div id="toast" class="toast" role="status"></div>
-  <script src="app.js?v=64"></script>
+  <script src="app.js?v=65"></script>
 </body>
 </html>
