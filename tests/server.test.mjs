@@ -712,6 +712,8 @@ test('public metadata provenance exposes only the latest applied source per fiel
   assert.equal(result.status,200);
   assert.equal(data.verified,true);
   assert.deepEqual(data.items.map(item=>[item.field,item.value,item.sourceUrl]),[['release_year',1996,'https://catalog.example/work'],['creator','창작자',null]]);
+  assert.deepEqual(data.items.map(item=>item.confidence),[90,85]);
+  assert.deepEqual(data.confidence,{score:88,tier:'medium',method:'evidence-authority-v1',verifiedFieldCount:2});
   assert.equal(JSON.stringify(data).includes('private-reviewer'),false);
   assert.equal(JSON.stringify(data).includes('report_id'),false);
 });
