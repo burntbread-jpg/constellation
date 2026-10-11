@@ -58,3 +58,11 @@ test('work details diagnose incomplete metadata and link each gap to a correctio
   assert.match(core, /data-metadata-missing/);
   assert.match(events, /openMetadataReport\(button\.dataset\.metadataMissing\)/);
 });
+
+test('metadata quality queue supports title, media, missing-field, and priority controls', async () => {
+  const html = await readFile(new URL('../dist/client/index.html', import.meta.url), 'utf8');
+  const core = await readFile(new URL('../src/client/01-core.js', import.meta.url), 'utf8');
+  for (const id of ['metadataQualitySearch','metadataQualityMedia','metadataQualityField','metadataQualitySort']) assert.match(html,new RegExp(`id="${id}"`));
+  assert.match(core,/function renderMetadataQuality\(\)/);
+  assert.match(core,/item\.missing\.includes\(field\)/);
+});
