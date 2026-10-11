@@ -71,6 +71,7 @@ async function routeApi(request,env,url){
   if(pathname==='/api/duplicate-candidates')return request.method==='GET'?duplicateWorkCandidates(request,env):methodNotAllowed(['GET']);
   if(pathname==='/api/duplicate-preview')return request.method==='GET'?duplicateMergePreview(request,env):methodNotAllowed(['GET']);
   if(pathname==='/api/duplicate-merge')return request.method==='POST'?mergeDuplicateWorks(request,env):methodNotAllowed(['POST']);
+  if(pathname==='/api/duplicate-merges')return request.method==='GET'?duplicateMergeHistory(request,env):methodNotAllowed(['GET']);
   if(pathname==='/api/metadata-provenance')return request.method==='GET'?publicMetadata(await publicMetadataProvenance(request,env),300):methodNotAllowed(['GET']);
   if(pathname.startsWith('/api/metadata-reports/')){const id=pathname.slice('/api/metadata-reports/'.length);return request.method==='PATCH'?reviewMetadataReport(request,env,id):methodNotAllowed(['PATCH'])}
   if(pathname==='/api/metadata-changes')return request.method==='GET'?metadataChangeHistory(request,env):methodNotAllowed(['GET']);

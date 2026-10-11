@@ -149,6 +149,7 @@ function mockSupabase(url, init = {}) {
     state.metadataReports=state.metadataReports.map(row=>row.work_id===body.p_duplicate_id?{...row,work_id:body.p_target_id,work_title:body.p_fields.title}:row);
     const audit={audit_id:state.duplicateMerges.length+1,target_id:body.p_target_id,removed_id:body.p_duplicate_id,impact:{}};state.duplicateMerges.push(audit);return response(audit);
   }
+  if(method==='GET'&&table==='duplicate_work_merges')return response(state.duplicateMerges);
   if (method === 'POST' && table === 'recommendation_feedback') {
     state.feedback.set(`${body.user_id}:${body.from_work_id}:${body.to_work_id}:${body.connection_mode}`, body);
     return response(null, 204);
@@ -781,6 +782,15 @@ test('reviewer can atomically merge a verified duplicate and retain an audit id'
   const denied=await worker.fetch(new Request('https://site.test/api/duplicate-merge',{method:'POST',headers:reviewerHeaders,body:JSON.stringify({targetId:'book:merge-a',duplicateId:'book:merge-b'})}),reviewerEnv);assert.equal(denied.status,400);
   const result=await worker.fetch(new Request('https://site.test/api/duplicate-merge',{method:'POST',headers:reviewerHeaders,body:JSON.stringify({targetId:'book:merge-a',duplicateId:'book:merge-b',fields:{title:'target',source:'duplicate'},confirmation:'MERGE_DUPLICATES'})}),reviewerEnv),data=await result.json();
   assert.equal(result.status,200);assert.equal(data.merged,true);assert.equal(data.auditId,1);assert.equal(state.works.has('book:merge-b'),false);assert.equal(state.works.get('book:merge-a').source,'Google Books');assert.ok(state.archive.has(`${reviewerId}:book:merge-a`));
+});
+
+test('duplicate merge history is reviewer-only and reports integrity',async()=>{
+  const reviewerId='88888888-8888-4888-8888-888888888888',reviewerHeaders={'oai-authenticated-user-id':reviewerId},reviewerEnv={...env,METADATA_REVIEWER_IDS:reviewerId};
+  state.works.set('book:audit-target',{id:'book:audit-target',title:'대표 작품',creator:'작가',media_type:'BOOK',source:'Open Library'});
+  state.duplicateMerges.push({id:99,target_work_id:'book:audit-target',removed_work_id:'book:audit-removed',target_snapshot:{title:'대표 작품'},removed_snapshot:{title:'중복 작품'},merged_fields:{title:'대표 작품'},impact:{archives:2,connections:4,feedback:1,reports:3},merged_at:'2026-10-11T00:00:00.000Z'});
+  const denied=await worker.fetch(new Request('https://site.test/api/duplicate-merges',{headers}),reviewerEnv);assert.equal(denied.status,403);
+  const result=await worker.fetch(new Request('https://site.test/api/duplicate-merges',{headers:reviewerHeaders}),reviewerEnv),data=await result.json();
+  assert.equal(result.status,200);const item=data.items.find(entry=>entry.id===99);assert.equal(item.integrity.healthy,true);assert.equal(item.impact.connections,4);assert.ok(data.healthy>=1);
 });
 
 test('archive lifecycle creates Taste DNA, aggregates it, and deletes it', async () => {

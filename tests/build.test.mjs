@@ -120,3 +120,10 @@ test('duplicate merge requires explicit confirmation and submits reviewed fields
   assert.match(core,/confirmation:'MERGE_DUPLICATES'/);
   assert.match(core,/\/api\/duplicate-merge/);
 });
+
+test('review dashboard exposes duplicate merge audit and integrity status',async()=>{
+  const html=await readFile(new URL('../dist/client/index.html',import.meta.url),'utf8');
+  const core=await readFile(new URL('../src/client/01-core.js',import.meta.url),'utf8');
+  assert.match(html,/id="duplicateMergeSummary"/);assert.match(html,/id="duplicateMergeList"/);
+  assert.match(core,/\/api\/duplicate-merges/);assert.match(core,/무결성 정상/);assert.match(core,/감사 기록/);
+});
