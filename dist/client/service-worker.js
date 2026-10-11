@@ -1,5 +1,5 @@
-const CACHE='taste-constellation-shell-v77';
-const SHELL=['/','/index.html','/privacy.html','/styles.css','/live-search.css','/archive.css?v=51','/pwa.css?v=44','/accessibility.css?v=45','/metadata.css?v=77','/app.js?v=77','/manifest.webmanifest','/icon.svg','/icon-192.png','/icon-512.png'];
+const CACHE='taste-constellation-shell-v78';
+const SHELL=['/','/index.html','/privacy.html','/styles.css','/live-search.css','/archive.css?v=51','/pwa.css?v=44','/accessibility.css?v=45','/metadata.css?v=78','/app.js?v=78','/manifest.webmanifest','/icon.svg','/icon-192.png','/icon-512.png'];
 
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()));

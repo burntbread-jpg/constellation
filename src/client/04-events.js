@@ -20,6 +20,7 @@ $('#metadataQualityList').onclick=e=>{const selection=e.target.closest('[data-qu
 $('#metadataQualitySelectVisible').onclick=()=>{const visible=filteredMetadataQuality().slice(0,10),allSelected=visible.length&&visible.every(item=>metadataQualitySelected.has(item.work.id));for(const item of visible)allSelected?metadataQualitySelected.delete(item.work.id):metadataQualitySelected.add(item.work.id);renderMetadataQuality()};$('#metadataQualityBatch').onclick=batchMetadataRepair;
 $('#metadataCandidateList').onclick=e=>{const button=e.target.closest('[data-candidate-use]');if(button)useMetadataCandidate(Number(button.dataset.candidateUse))};
 $('#duplicateCandidateList').onclick=e=>{const button=e.target.closest('[data-duplicate-preview]');if(button)openDuplicatePreview(button)};
+$('#duplicatePreviewBody').onchange=e=>{if(e.target.matches('[data-duplicate-confirm]'))$('#duplicatePreviewBody [data-duplicate-merge]').disabled=!e.target.checked};$('#duplicatePreviewBody').onclick=e=>{const button=e.target.closest('[data-duplicate-merge]');if(button)submitDuplicateMerge(button)};
 $('#metadataQualitySearch').oninput=renderMetadataQuality;$('#metadataQualityMedia').onchange=renderMetadataQuality;$('#metadataQualityField').onchange=renderMetadataQuality;$('#metadataQualitySort').onchange=renderMetadataQuality;
 $('#archiveCount').textContent='…';renderWork();loadArchive();
 loadMetadataReviewQueue();

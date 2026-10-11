@@ -24,6 +24,7 @@ const state = {
   feedback: new Map(),
   metadataReports: [],
   metadataChanges: [],
+  duplicateMerges: [],
   catalogQueries: [],
   profileWrites: 0,
   backfillCalls: 0,
@@ -136,6 +137,17 @@ function mockSupabase(url, init = {}) {
       state.connections.push({...item, user_id: body.p_user_id});
     }
     return response(null, 204);
+  }
+  if (method === 'POST' && table === 'merge_duplicate_works') {
+    const target=state.works.get(body.p_target_id),duplicate=state.works.get(body.p_duplicate_id);
+    if(!target||!duplicate)return response({message:'work not found'},400);
+    state.works.set(body.p_target_id,{...target,...body.p_fields,id:body.p_target_id});state.works.delete(body.p_duplicate_id);
+    for(const [key,item] of [...state.archive])if(item.work_id===body.p_duplicate_id){state.archive.delete(key);const moved={...item,work_id:body.p_target_id,work_json:{...(item.work_json||{}),...body.p_fields,id:body.p_target_id}};state.archive.set(`${item.user_id}:${body.p_target_id}`,{...moved,...state.archive.get(`${item.user_id}:${body.p_target_id}`)})}
+    state.tags=state.tags.map(tag=>tag.work_id===body.p_duplicate_id?{...tag,work_id:body.p_target_id}:tag);
+    state.connections=state.connections.map(row=>({...row,from_work_id:row.from_work_id===body.p_duplicate_id?body.p_target_id:row.from_work_id,to_work_id:row.to_work_id===body.p_duplicate_id?body.p_target_id:row.to_work_id})).filter(row=>row.from_work_id!==row.to_work_id);
+    state.feedback=new Map([...state.feedback.values()].map(row=>{const moved={...row,from_work_id:row.from_work_id===body.p_duplicate_id?body.p_target_id:row.from_work_id,to_work_id:row.to_work_id===body.p_duplicate_id?body.p_target_id:row.to_work_id};return[`${moved.user_id}:${moved.from_work_id}:${moved.to_work_id}:${moved.connection_mode}`,moved]}).filter(([,row])=>row.from_work_id!==row.to_work_id));
+    state.metadataReports=state.metadataReports.map(row=>row.work_id===body.p_duplicate_id?{...row,work_id:body.p_target_id,work_title:body.p_fields.title}:row);
+    const audit={audit_id:state.duplicateMerges.length+1,target_id:body.p_target_id,removed_id:body.p_duplicate_id,impact:{}};state.duplicateMerges.push(audit);return response(audit);
   }
   if (method === 'POST' && table === 'recommendation_feedback') {
     state.feedback.set(`${body.user_id}:${body.from_work_id}:${body.to_work_id}:${body.connection_mode}`, body);
@@ -759,6 +771,16 @@ test('duplicate merge preview is read-only and reports field conflicts', async()
   assert.equal(data.canMerge,false);
   assert.equal(data.nextStep,'46-3');
   assert.ok(data.comparison.some(item=>item.field==='source'&&item.conflict));
+});
+
+test('reviewer can atomically merge a verified duplicate and retain an audit id',async()=>{
+  const reviewerId='77777777-7777-4777-8777-777777777777',reviewerHeaders={'oai-authenticated-user-id':reviewerId,'content-type':'application/json'},reviewerEnv={...env,METADATA_REVIEWER_IDS:reviewerId};
+  state.works.set('book:merge-a',{id:'book:merge-a',title:'병합 작품 1권',creator:'작가',release_year:2000,media_type:'BOOK',source:'Open Library'});
+  state.works.set('book:merge-b',{id:'book:merge-b',title:'병합 작품 세트',creator:'작가',release_year:2000,media_type:'MANGA',source:'Google Books'});
+  state.archive.set(`${reviewerId}:book:merge-b`,{user_id:reviewerId,work_id:'book:merge-b',work_json:{id:'book:merge-b',title:'병합 작품 세트'}});
+  const denied=await worker.fetch(new Request('https://site.test/api/duplicate-merge',{method:'POST',headers:reviewerHeaders,body:JSON.stringify({targetId:'book:merge-a',duplicateId:'book:merge-b'})}),reviewerEnv);assert.equal(denied.status,400);
+  const result=await worker.fetch(new Request('https://site.test/api/duplicate-merge',{method:'POST',headers:reviewerHeaders,body:JSON.stringify({targetId:'book:merge-a',duplicateId:'book:merge-b',fields:{title:'target',source:'duplicate'},confirmation:'MERGE_DUPLICATES'})}),reviewerEnv),data=await result.json();
+  assert.equal(result.status,200);assert.equal(data.merged,true);assert.equal(data.auditId,1);assert.equal(state.works.has('book:merge-b'),false);assert.equal(state.works.get('book:merge-a').source,'Google Books');assert.ok(state.archive.has(`${reviewerId}:book:merge-a`));
 });
 
 test('archive lifecycle creates Taste DNA, aggregates it, and deletes it', async () => {
