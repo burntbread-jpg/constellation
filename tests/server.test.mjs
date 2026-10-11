@@ -169,7 +169,8 @@ function mockSupabase(url, init = {}) {
   if (method === 'GET' && table === 'metadata_changes') {
     const id = parsed.searchParams.get('id')?.replace(/^eq\./, '');
     const status = parsed.searchParams.get('status')?.replace(/^eq\./, '');
-    return response(state.metadataChanges.filter(row => (!id || String(row.id) === id) && (!status || row.status === status)));
+    const workId = parsed.searchParams.get('work_id')?.replace(/^eq\./, '');
+    return response(state.metadataChanges.filter(row => (!id || String(row.id) === id) && (!status || row.status === status) && (!workId || row.work_id === workId)));
   }
   if (method === 'PATCH' && table === 'metadata_changes') {
     const id = parsed.searchParams.get('id')?.replace(/^eq\./, '');
@@ -698,6 +699,21 @@ test('metadata change history is reviewer-only and rollback restores shared and 
   assert.equal(state.archive.get(`${userId}:film:history`).work_json.release_year,1995);
   assert.equal(state.metadataChanges[0].status,'rolled_back');
   assert.equal(state.metadataChanges[0].rolled_back_by,reviewerId);
+});
+
+test('public metadata provenance exposes only the latest applied source per field', async () => {
+  state.metadataChanges.push(
+    {id:1,report_id:7,work_id:'film:public-source',work_title:'출처 작품',field_name:'release_year',new_value:1996,evidence_type:'authority_database',source_url:'https://catalog.example/work',status:'applied',changed_by:'private-reviewer',changed_at:'2026-10-10T00:00:00.000Z'},
+    {id:2,report_id:6,work_id:'film:public-source',work_title:'출처 작품',field_name:'release_year',new_value:1995,evidence_type:'reference',source_url:'https://old.example/work',status:'applied',changed_by:'private-reviewer',changed_at:'2026-10-09T00:00:00.000Z'},
+    {id:3,report_id:5,work_id:'film:public-source',work_title:'출처 작품',field_name:'creator',new_value:'창작자',evidence_type:'official',source_url:'javascript:alert(1)',status:'applied',changed_by:'private-reviewer',changed_at:'2026-10-08T00:00:00.000Z'},
+    {id:4,report_id:4,work_id:'film:public-source',work_title:'출처 작품',field_name:'title',new_value:'이전 제목',evidence_type:'publisher',source_url:'https://publisher.example/work',status:'rolled_back',changed_by:'private-reviewer',changed_at:'2026-10-07T00:00:00.000Z'}
+  );
+  const result=await worker.fetch(new Request('https://site.test/api/metadata-provenance?workId=film%3Apublic-source'),env),data=await result.json();
+  assert.equal(result.status,200);
+  assert.equal(data.verified,true);
+  assert.deepEqual(data.items.map(item=>[item.field,item.value,item.sourceUrl]),[['release_year',1996,'https://catalog.example/work'],['creator','창작자',null]]);
+  assert.equal(JSON.stringify(data).includes('private-reviewer'),false);
+  assert.equal(JSON.stringify(data).includes('report_id'),false);
 });
 
 test('archive lifecycle creates Taste DNA, aggregates it, and deletes it', async () => {
