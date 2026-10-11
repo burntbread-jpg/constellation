@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="archive.css?v=51" />
   <link rel="stylesheet" href="pwa.css?v=44" />
   <link rel="stylesheet" href="accessibility.css?v=45" />
-  <link rel="stylesheet" href="metadata.css?v=75" />
+  <link rel="stylesheet" href="metadata.css?v=76" />
 </head>
 <body>
   <a class="skip-link" href="#mainContent">본문으로 건너뛰기</a>
@@ -203,6 +203,10 @@
       </div>
       <div class="metadata-quality-bulk"><button id="metadataQualitySelectVisible" type="button">보이는 작품 선택</button><span id="metadataQualitySelected">0개 선택</span><button id="metadataQualityBatch" type="button" disabled>선택 작품 일괄 보강</button></div>
       <div id="metadataQualityList" class="metadata-quality-list"></div>
+      <h3 class="metadata-review-heading">중복 작품 후보</h3>
+      <p class="dialog-lead">탐지 결과만 표시합니다. 이 단계에서는 작품이나 사용자 데이터를 병합하지 않습니다.</p>
+      <div id="duplicateCandidateSummary" class="metadata-quality-summary"><p class="review-empty">중복 후보를 확인하고 있어요.</p></div>
+      <div id="duplicateCandidateList" class="duplicate-candidate-list"></div>
       <h3 class="metadata-review-heading">검토 대기</h3>
       <div id="metadataReviewList" class="metadata-review-list"></div>
       <h3 class="metadata-review-heading">변경 이력</h3>
@@ -220,6 +224,6 @@
     </div>
   </dialog>
   <div id="toast" class="toast" role="status"></div>
-  <script src="app.js?v=75"></script>
+  <script src="app.js?v=76"></script>
 </body>
 </html>

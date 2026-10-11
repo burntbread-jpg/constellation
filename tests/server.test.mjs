@@ -733,6 +733,21 @@ test('metadata quality dashboard ranks incomplete works for reviewers only', asy
   assert.equal(data.items.some(item=>item.work.id==='film:quality-complete'),false);
 });
 
+test('duplicate detector groups editions but excludes adaptations and remakes', async () => {
+  const reviewerId='55555555-5555-4555-8555-555555555555',headers={'oai-authenticated-user-id':reviewerId},reviewerEnv={...env,METADATA_REVIEWER_IDS:reviewerId};
+  state.works.set('book:dup-1',{id:'book:dup-1',title:'기생수 1권',creator:'이와아키 히토시',release_year:1990,media_type:'MANGA',source:'Open Library'});
+  state.works.set('book:dup-set',{id:'book:dup-set',title:'[세트] 기생수 전 10권',creator:'이와아키 히토시',release_year:1990,media_type:'BOOK',source:'Google Books'});
+  state.works.set('anime:dup',{id:'anime:dup',title:'기생수',creator:'감독',release_year:2014,media_type:'ANIME',source:'AniList'});
+  state.works.set('film:old',{id:'film:old',title:'동명 영화',creator:'감독 A',release_year:1980,media_type:'FILM',source:'TMDB'});
+  state.works.set('film:new',{id:'film:new',title:'동명 영화',creator:'감독 B',release_year:2020,media_type:'FILM',source:'TMDB'});
+  const result=await worker.fetch(new Request('https://site.test/api/duplicate-candidates',{headers}),reviewerEnv),data=await result.json();
+  assert.equal(result.status,200);
+  assert.ok(data.items.some(item=>[item.left.id,item.right.id].includes('book:dup-1')&&[item.left.id,item.right.id].includes('book:dup-set')));
+  assert.ok(data.excluded.adaptation>=1);
+  assert.ok(data.excluded.remake>=1);
+  assert.equal(data.readOnly,true);
+});
+
 test('archive lifecycle creates Taste DNA, aggregates it, and deletes it', async () => {
   const work = {
     id: 'openlibrary:/works/OL1W',

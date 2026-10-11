@@ -101,3 +101,12 @@ test('metadata quality queue can batch trusted candidates into review without ap
   assert.match(core,/작품 정보는 자동 변경되지 않습니다/);
   assert.match(core,/\/api\/metadata-reports/);
 });
+
+test('review dashboard presents duplicate detection as a read-only operation', async () => {
+  const html=await readFile(new URL('../dist/client/index.html',import.meta.url),'utf8');
+  const core=await readFile(new URL('../src/client/01-core.js',import.meta.url),'utf8');
+  assert.match(html,/id="duplicateCandidateList"/);
+  assert.match(core,/\/api\/duplicate-candidates/);
+  assert.match(core,/읽기 전용 탐지 결과 · 병합되지 않음/);
+  assert.match(core,/각색.*리메이크.*제외/);
+});
