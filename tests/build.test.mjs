@@ -77,3 +77,16 @@ test('metadata quality gaps can preload a reviewer correction from free provider
   assert.match(core,/확인한 뒤 승인해 주세요/);
   assert.match(events,/suggestMetadataRepair\(suggestion\)/);
 });
+
+test('metadata repair candidates expose identity evidence before creating a proposal', async () => {
+  const html = await readFile(new URL('../dist/client/index.html', import.meta.url), 'utf8');
+  const core = await readFile(new URL('../src/client/01-core.js', import.meta.url), 'utf8');
+  const events = await readFile(new URL('../src/client/04-events.js', import.meta.url), 'utf8');
+  assert.match(html,/id="metadataCandidateDialog"/);
+  assert.match(html,/id="metadataCandidateList"/);
+  assert.match(core,/function scoreMetadataCandidate\(item,w\)/);
+  for (const label of ['제목','매체','창작자','연도']) assert.match(core,new RegExp(label));
+  assert.match(core,/작품 일치 참고 점수/);
+  assert.match(core,/slice\(0,6\)/);
+  assert.match(events,/useMetadataCandidate/);
+});

@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="archive.css?v=51" />
   <link rel="stylesheet" href="pwa.css?v=44" />
   <link rel="stylesheet" href="accessibility.css?v=45" />
-  <link rel="stylesheet" href="metadata.css?v=73" />
+  <link rel="stylesheet" href="metadata.css?v=74" />
 </head>
 <body>
   <a class="skip-link" href="#mainContent">본문으로 건너뛰기</a>
@@ -209,7 +209,16 @@
       <div id="metadataChangeList" class="metadata-review-list"></div>
     </div>
   </dialog>
+  <dialog id="metadataCandidateDialog" class="taste-dialog metadata-candidate-dialog" aria-labelledby="metadataCandidateTitle">
+    <div>
+      <button class="dialog-close" type="button" aria-label="닫기" onclick="this.closest('dialog').close()">×</button>
+      <p class="eyebrow">CANDIDATE CHECK</p><h2 id="metadataCandidateTitle">작품 정보 후보 비교</h2>
+      <p class="dialog-lead">무료 데이터 출처의 결과를 비교했습니다. 점수는 작품 일치 가능성을 돕는 참고값이며 자동 승인되지 않습니다.</p>
+      <section id="metadataCandidateCurrent" class="metadata-candidate-current"></section>
+      <div id="metadataCandidateList" class="metadata-candidate-list"></div>
+    </div>
+  </dialog>
   <div id="toast" class="toast" role="status"></div>
-  <script src="app.js?v=73"></script>
+  <script src="app.js?v=74"></script>
 </body>
 </html>

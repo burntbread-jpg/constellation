@@ -17,6 +17,7 @@ document.addEventListener('click',e=>{const retry=e.target.closest('[data-retry-
 document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();$('#searchInput').focus()}if(e.key==='Escape')setSearchOpen(false);if(e.key==='ArrowDown'&&document.activeElement===$('#searchInput')){const first=$('#searchResults [data-result]');if(first){e.preventDefault();first.focus()}}});
 $('#metadataReviewBtn').onclick=openMetadataReview;$('#metadataReviewList').onclick=e=>{const button=e.target.closest('[data-review-decision]');if(button)reviewMetadata(button)};$('#metadataChangeList').onclick=e=>{const button=e.target.closest('[data-rollback-change]');if(button)rollbackMetadata(button)};
 $('#metadataQualityList').onclick=e=>{const suggestion=e.target.closest('[data-quality-suggest]');if(suggestion){suggestMetadataRepair(suggestion);return}const button=e.target.closest('[data-quality-work]');if(!button)return;$('#metadataReviewDialog').close();showView('discover');selectWork(button.dataset.qualityWork)};
+$('#metadataCandidateList').onclick=e=>{const button=e.target.closest('[data-candidate-use]');if(button)useMetadataCandidate(Number(button.dataset.candidateUse))};
 $('#metadataQualitySearch').oninput=renderMetadataQuality;$('#metadataQualityMedia').onchange=renderMetadataQuality;$('#metadataQualityField').onchange=renderMetadataQuality;$('#metadataQualitySort').onchange=renderMetadataQuality;
 $('#archiveCount').textContent='…';renderWork();loadArchive();
 loadMetadataReviewQueue();
