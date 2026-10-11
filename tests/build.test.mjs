@@ -90,3 +90,14 @@ test('metadata repair candidates expose identity evidence before creating a prop
   assert.match(core,/slice\(0,6\)/);
   assert.match(events,/useMetadataCandidate/);
 });
+
+test('metadata quality queue can batch trusted candidates into review without applying them', async () => {
+  const html = await readFile(new URL('../dist/client/index.html', import.meta.url), 'utf8');
+  const core = await readFile(new URL('../src/client/01-core.js', import.meta.url), 'utf8');
+  assert.match(html,/id="metadataQualityBatch"/);
+  assert.match(core,/async function batchMetadataRepair\(\)/);
+  assert.match(core,/assessment\.score<55/);
+  assert.match(core,/submitted>=20/);
+  assert.match(core,/작품 정보는 자동 변경되지 않습니다/);
+  assert.match(core,/\/api\/metadata-reports/);
+});

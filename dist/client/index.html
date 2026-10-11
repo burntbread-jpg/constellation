@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="archive.css?v=51" />
   <link rel="stylesheet" href="pwa.css?v=44" />
   <link rel="stylesheet" href="accessibility.css?v=45" />
-  <link rel="stylesheet" href="metadata.css?v=74" />
+  <link rel="stylesheet" href="metadata.css?v=75" />
 </head>
 <body>
   <a class="skip-link" href="#mainContent">본문으로 건너뛰기</a>
@@ -201,6 +201,7 @@
         <select id="metadataQualityField" aria-label="누락 정보 필터"><option value="all">모든 누락 항목</option><option value="year">연도</option><option value="creator">창작자</option><option value="poster">이미지</option><option value="intro">소개</option><option value="media_type">매체</option><option value="source">출처</option></select>
         <select id="metadataQualitySort" aria-label="정렬"><option value="severity">보완 시급순</option><option value="missing">누락 많은 순</option><option value="title">제목순</option></select>
       </div>
+      <div class="metadata-quality-bulk"><button id="metadataQualitySelectVisible" type="button">보이는 작품 선택</button><span id="metadataQualitySelected">0개 선택</span><button id="metadataQualityBatch" type="button" disabled>선택 작품 일괄 보강</button></div>
       <div id="metadataQualityList" class="metadata-quality-list"></div>
       <h3 class="metadata-review-heading">검토 대기</h3>
       <div id="metadataReviewList" class="metadata-review-list"></div>
@@ -219,6 +220,6 @@
     </div>
   </dialog>
   <div id="toast" class="toast" role="status"></div>
-  <script src="app.js?v=74"></script>
+  <script src="app.js?v=75"></script>
 </body>
 </html>

@@ -1,3 +1,4 @@
+.metadata-quality-bulk{display:flex;align-items:center;gap:8px;margin:9px 0}.metadata-quality-bulk span{margin-right:auto;color:var(--muted);font-size:10px}.metadata-quality-bulk button{padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:#171a20;color:var(--ink);cursor:pointer}.metadata-quality-bulk button:last-child{border-color:#566d32;color:var(--acid)}.metadata-quality-bulk button:disabled{opacity:.45;cursor:not-allowed}.metadata-quality-list>article{position:relative}.metadata-quality-check{position:absolute;z-index:2;top:12px;left:10px}.metadata-quality-open{padding-left:38px!important}@media(max-width:620px){.metadata-quality-bulk{align-items:stretch;flex-wrap:wrap}.metadata-quality-bulk span{display:flex;align-items:center}.metadata-quality-bulk button:last-child{width:100%}}
 .metadata-report-btn {
   margin-top: 14px;
   border: 0;
