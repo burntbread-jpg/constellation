@@ -66,3 +66,14 @@ test('metadata quality queue supports title, media, missing-field, and priority 
   assert.match(core,/function renderMetadataQuality\(\)/);
   assert.match(core,/item\.missing\.includes\(field\)/);
 });
+
+test('metadata quality gaps can preload a reviewer correction from free providers', async () => {
+  const core = await readFile(new URL('../src/client/01-core.js', import.meta.url), 'utf8');
+  const events = await readFile(new URL('../src/client/04-events.js', import.meta.url), 'utf8');
+  assert.match(core,/data-quality-suggest/);
+  assert.match(core,/async function suggestMetadataRepair\(button\)/);
+  assert.match(core,/\/api\/artwork\?/);
+  assert.match(core,/\/api\/search\?q=/);
+  assert.match(core,/확인한 뒤 승인해 주세요/);
+  assert.match(events,/suggestMetadataRepair\(suggestion\)/);
+});
