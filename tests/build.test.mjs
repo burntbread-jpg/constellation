@@ -127,3 +127,11 @@ test('review dashboard exposes duplicate merge audit and integrity status',async
   assert.match(html,/id="duplicateMergeSummary"/);assert.match(html,/id="duplicateMergeList"/);
   assert.match(core,/\/api\/duplicate-merges/);assert.match(core,/무결성 정상/);assert.match(core,/감사 기록/);
 });
+
+test('review dashboard can safely restore a merged work catalog',async()=>{
+  const core=await readFile(new URL('../src/client/01-core.js',import.meta.url),'utf8');
+  const router=await readFile(new URL('../src/server/06-router.js',import.meta.url),'utf8');
+  const migration=await readFile(new URL('../supabase/migrations/20261011_stage48_duplicate_merge_recovery.sql',import.meta.url),'utf8');
+  assert.match(core,/confirmation:'RESTORE_CATALOG'/);assert.match(core,/개인화 데이터는 대표 작품에 유지/);
+  assert.match(router,/restoreDuplicateMerge/);assert.match(migration,/restore_duplicate_work_merge/);assert.match(migration,/restored_at/);
+});

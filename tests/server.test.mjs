@@ -147,7 +147,10 @@ function mockSupabase(url, init = {}) {
     state.connections=state.connections.map(row=>({...row,from_work_id:row.from_work_id===body.p_duplicate_id?body.p_target_id:row.from_work_id,to_work_id:row.to_work_id===body.p_duplicate_id?body.p_target_id:row.to_work_id})).filter(row=>row.from_work_id!==row.to_work_id);
     state.feedback=new Map([...state.feedback.values()].map(row=>{const moved={...row,from_work_id:row.from_work_id===body.p_duplicate_id?body.p_target_id:row.from_work_id,to_work_id:row.to_work_id===body.p_duplicate_id?body.p_target_id:row.to_work_id};return[`${moved.user_id}:${moved.from_work_id}:${moved.to_work_id}:${moved.connection_mode}`,moved]}).filter(([,row])=>row.from_work_id!==row.to_work_id));
     state.metadataReports=state.metadataReports.map(row=>row.work_id===body.p_duplicate_id?{...row,work_id:body.p_target_id,work_title:body.p_fields.title}:row);
-    const audit={audit_id:state.duplicateMerges.length+1,target_id:body.p_target_id,removed_id:body.p_duplicate_id,impact:{}};state.duplicateMerges.push(audit);return response(audit);
+    const id=state.duplicateMerges.length+1,audit={id,target_work_id:body.p_target_id,removed_work_id:body.p_duplicate_id,target_snapshot:target,removed_snapshot:duplicate,merged_fields:body.p_fields,impact:{},merged_at:new Date().toISOString(),restored_at:null,restored_by:null,restore_reason:null};state.duplicateMerges.push(audit);return response({audit_id:id,target_id:body.p_target_id,removed_id:body.p_duplicate_id,impact:{}});
+  }
+  if(method==='POST'&&table==='restore_duplicate_work_merge'){
+    const audit=state.duplicateMerges.find(row=>Number(row.id)===Number(body.p_audit_id));if(!audit)return response({message:'merge audit not found'},400);if(audit.restored_at)return response({message:'merge already restored'},400);if(!state.works.has(audit.target_work_id))return response({message:'merge target is missing'},400);if(state.works.has(audit.removed_work_id))return response({message:'removed work already exists'},400);state.works.set(audit.removed_work_id,{...audit.removed_snapshot});audit.restored_at=new Date().toISOString();audit.restored_by=body.p_reviewer_id;audit.restore_reason=body.p_reason;return response({audit_id:audit.id,target_id:audit.target_work_id,restored_id:audit.removed_work_id,catalog_restored:true,personalization_split:false});
   }
   if(method==='GET'&&table==='duplicate_work_merges')return response(state.duplicateMerges);
   if (method === 'POST' && table === 'recommendation_feedback') {
@@ -791,6 +794,16 @@ test('duplicate merge history is reviewer-only and reports integrity',async()=>{
   const denied=await worker.fetch(new Request('https://site.test/api/duplicate-merges',{headers}),reviewerEnv);assert.equal(denied.status,403);
   const result=await worker.fetch(new Request('https://site.test/api/duplicate-merges',{headers:reviewerHeaders}),reviewerEnv),data=await result.json();
   assert.equal(result.status,200);const item=data.items.find(entry=>entry.id===99);assert.equal(item.integrity.healthy,true);assert.equal(item.impact.connections,4);assert.ok(data.healthy>=1);
+});
+
+test('reviewer can restore a removed work catalog without splitting personalization',async()=>{
+  const reviewerId='99999999-9999-4999-8999-999999999999',reviewerHeaders={'oai-authenticated-user-id':reviewerId,'content-type':'application/json'},reviewerEnv={...env,METADATA_REVIEWER_IDS:reviewerId};
+  state.works.set('book:restore-target',{id:'book:restore-target',title:'대표 작품',creator:'작가',media_type:'BOOK',source:'Open Library'});
+  state.duplicateMerges.push({id:101,target_work_id:'book:restore-target',removed_work_id:'book:restore-removed',target_snapshot:{id:'book:restore-target',title:'대표 작품'},removed_snapshot:{id:'book:restore-removed',title:'별개 작품',creator:'작가',media_type:'BOOK',source:'Google Books'},merged_fields:{title:'대표 작품'},impact:{archives:1},merged_at:'2026-10-11T00:00:00.000Z',restored_at:null});
+  const invalid=await worker.fetch(new Request('https://site.test/api/duplicate-merges/101',{method:'PATCH',headers:reviewerHeaders,body:JSON.stringify({confirmation:'RESTORE_CATALOG',reason:'짧음'})}),reviewerEnv);assert.equal(invalid.status,400);
+  const result=await worker.fetch(new Request('https://site.test/api/duplicate-merges/101',{method:'PATCH',headers:reviewerHeaders,body:JSON.stringify({confirmation:'RESTORE_CATALOG',reason:'서로 다른 작품으로 확인됨'})}),reviewerEnv),data=await result.json();
+  assert.equal(result.status,200);assert.equal(data.catalogRestored,true);assert.equal(data.personalizationSplit,false);assert.equal(state.works.get('book:restore-removed').title,'별개 작품');
+  const history=await worker.fetch(new Request('https://site.test/api/duplicate-merges',{headers:reviewerHeaders}),reviewerEnv),historyData=await history.json(),item=historyData.items.find(entry=>entry.id===101);assert.equal(item.status,'restored');assert.equal(item.integrity.healthy,true);assert.equal(item.recoverable,false);
 });
 
 test('archive lifecycle creates Taste DNA, aggregates it, and deletes it', async () => {
