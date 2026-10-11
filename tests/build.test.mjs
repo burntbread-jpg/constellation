@@ -135,3 +135,11 @@ test('review dashboard can safely restore a merged work catalog',async()=>{
   assert.match(core,/confirmation:'RESTORE_CATALOG'/);assert.match(core,/개인화 데이터는 대표 작품에 유지/);
   assert.match(router,/restoreDuplicateMerge/);assert.match(migration,/restore_duplicate_work_merge/);assert.match(migration,/restored_at/);
 });
+
+test('work detail omits the generic culture bridge sentence and restored pairs stay suppressed',async()=>{
+  const html=await readFile(new URL('../dist/client/index.html',import.meta.url),'utf8');
+  const core=await readFile(new URL('../src/client/01-core.js',import.meta.url),'utf8');
+  const storage=await readFile(new URL('../src/server/02-storage.js',import.meta.url),'utf8');
+  assert.doesNotMatch(html,/id="cultureContext"/);assert.doesNotMatch(core,/\$\('#cultureContext'\)/);
+  assert.match(storage,/restoredPairs/);assert.match(core,/복구 판정/);
+});

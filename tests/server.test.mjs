@@ -152,7 +152,7 @@ function mockSupabase(url, init = {}) {
   if(method==='POST'&&table==='restore_duplicate_work_merge'){
     const audit=state.duplicateMerges.find(row=>Number(row.id)===Number(body.p_audit_id));if(!audit)return response({message:'merge audit not found'},400);if(audit.restored_at)return response({message:'merge already restored'},400);if(!state.works.has(audit.target_work_id))return response({message:'merge target is missing'},400);if(state.works.has(audit.removed_work_id))return response({message:'removed work already exists'},400);state.works.set(audit.removed_work_id,{...audit.removed_snapshot});audit.restored_at=new Date().toISOString();audit.restored_by=body.p_reviewer_id;audit.restore_reason=body.p_reason;return response({audit_id:audit.id,target_id:audit.target_work_id,restored_id:audit.removed_work_id,catalog_restored:true,personalization_split:false});
   }
-  if(method==='GET'&&table==='duplicate_work_merges')return response(state.duplicateMerges);
+  if(method==='GET'&&table==='duplicate_work_merges')return response(parsed.searchParams.get('restored_at')==='not.is.null'?state.duplicateMerges.filter(row=>row.restored_at):state.duplicateMerges);
   if (method === 'POST' && table === 'recommendation_feedback') {
     state.feedback.set(`${body.user_id}:${body.from_work_id}:${body.to_work_id}:${body.connection_mode}`, body);
     return response(null, 204);
@@ -804,6 +804,7 @@ test('reviewer can restore a removed work catalog without splitting personalizat
   const result=await worker.fetch(new Request('https://site.test/api/duplicate-merges/101',{method:'PATCH',headers:reviewerHeaders,body:JSON.stringify({confirmation:'RESTORE_CATALOG',reason:'서로 다른 작품으로 확인됨'})}),reviewerEnv),data=await result.json();
   assert.equal(result.status,200);assert.equal(data.catalogRestored,true);assert.equal(data.personalizationSplit,false);assert.equal(state.works.get('book:restore-removed').title,'별개 작품');
   const history=await worker.fetch(new Request('https://site.test/api/duplicate-merges',{headers:reviewerHeaders}),reviewerEnv),historyData=await history.json(),item=historyData.items.find(entry=>entry.id===101);assert.equal(item.status,'restored');assert.equal(item.integrity.healthy,true);assert.equal(item.recoverable,false);
+  const candidates=await worker.fetch(new Request('https://site.test/api/duplicate-candidates',{headers:reviewerHeaders}),reviewerEnv),candidateData=await candidates.json();assert.equal(candidateData.items.some(entry=>entry.id.includes('book:restore-target')&&entry.id.includes('book:restore-removed')),false);assert.ok(candidateData.excluded.restored>=1);
 });
 
 test('archive lifecycle creates Taste DNA, aggregates it, and deletes it', async () => {
