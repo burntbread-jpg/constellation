@@ -67,6 +67,7 @@ async function routeApi(request,env,url){
   if(pathname==='/api/editorial-intro')return request.method==='POST'?editorialIntro(request):methodNotAllowed(['POST']);
   if(pathname==='/api/metadata-reports')return request.method==='POST'?metadataReport(request,env):request.method==='GET'?metadataReportQueue(request,env):methodNotAllowed(['GET','POST']);
   if(pathname==='/api/my-metadata-reports')return request.method==='GET'?myMetadataReports(request,env):methodNotAllowed(['GET']);
+  if(pathname==='/api/metadata-quality')return request.method==='GET'?metadataQualityDashboard(request,env):methodNotAllowed(['GET']);
   if(pathname==='/api/metadata-provenance')return request.method==='GET'?publicMetadata(await publicMetadataProvenance(request,env),300):methodNotAllowed(['GET']);
   if(pathname.startsWith('/api/metadata-reports/')){const id=pathname.slice('/api/metadata-reports/'.length);return request.method==='PATCH'?reviewMetadataReport(request,env,id):methodNotAllowed(['PATCH'])}
   if(pathname==='/api/metadata-changes')return request.method==='GET'?metadataChangeHistory(request,env):methodNotAllowed(['GET']);

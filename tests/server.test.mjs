@@ -189,7 +189,7 @@ function mockSupabase(url, init = {}) {
   }
   if (method === 'GET' && table === 'works') {
     const id = parsed.searchParams.get('id')?.replace(/^eq\./, '');
-    return response(id && state.works.has(id) ? [state.works.get(id)] : []);
+    return response(id ? (state.works.has(id) ? [state.works.get(id)] : []) : [...state.works.values()]);
   }
   if (method === 'POST' && table === 'archive_items') {
     state.archive.set(`${body.user_id}:${body.work_id}`, body);
@@ -716,6 +716,21 @@ test('public metadata provenance exposes only the latest applied source per fiel
   assert.deepEqual(data.confidence,{score:88,tier:'medium',method:'evidence-authority-v1',verifiedFieldCount:2});
   assert.equal(JSON.stringify(data).includes('private-reviewer'),false);
   assert.equal(JSON.stringify(data).includes('report_id'),false);
+});
+
+test('metadata quality dashboard ranks incomplete works for reviewers only', async () => {
+  const reviewerId='44444444-4444-4444-8444-444444444444',reviewerHeaders={'oai-authenticated-user-id':reviewerId,'oai-authenticated-user-email':'reviewer@example.com'},reviewerEnv={...env,METADATA_REVIEWER_IDS:reviewerId};
+  state.works.set('film:quality-complete',{id:'film:quality-complete',title:'완성 작품',creator:'감독',release_year:2020,media_type:'FILM',poster_url:'https://image.example/poster.jpg',description:'충분한 길이의 작품 소개 문장입니다.',source:'TMDB'});
+  state.works.set('book:quality-missing',{id:'book:quality-missing',title:'보완 작품',creator:'작자 미상',release_year:null,media_type:'OTHER',poster_url:null,description:'',source:'Taste Constellation'});
+  const denied=await worker.fetch(new Request('https://site.test/api/metadata-quality',{headers}),reviewerEnv);
+  assert.equal(denied.status,403);
+  const result=await worker.fetch(new Request('https://site.test/api/metadata-quality',{headers:reviewerHeaders}),reviewerEnv),data=await result.json();
+  assert.equal(result.status,200);
+  assert.ok(data.total>=2);
+  const incomplete=data.items.find(item=>item.work.id==='book:quality-missing');
+  assert.deepEqual(incomplete.missing,['year','creator','poster','intro','media_type','source']);
+  assert.equal(incomplete.score,0);
+  assert.equal(data.items.some(item=>item.work.id==='film:quality-complete'),false);
 });
 
 test('archive lifecycle creates Taste DNA, aggregates it, and deletes it', async () => {

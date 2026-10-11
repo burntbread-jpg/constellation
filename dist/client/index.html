@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="archive.css?v=51" />
   <link rel="stylesheet" href="pwa.css?v=44" />
   <link rel="stylesheet" href="accessibility.css?v=45" />
-  <link rel="stylesheet" href="metadata.css?v=70" />
+  <link rel="stylesheet" href="metadata.css?v=71" />
 </head>
 <body>
   <a class="skip-link" href="#mainContent">본문으로 건너뛰기</a>
@@ -193,6 +193,9 @@
       <button class="dialog-close" type="button" aria-label="닫기" onclick="this.closest('dialog').close()">×</button>
       <p class="eyebrow">METADATA REVIEW</p><h2 id="metadataReviewTitle">작품 정보 수정 제안</h2>
       <p class="dialog-lead">승인하면 공용 작품 정보와 저장된 성좌의 메타데이터에 반영됩니다.</p>
+      <h3 class="metadata-review-heading">작품 정보 품질</h3>
+      <div id="metadataQualitySummary" class="metadata-quality-summary"><p class="review-empty">정보 완성도를 계산하고 있어요.</p></div>
+      <div id="metadataQualityList" class="metadata-quality-list"></div>
       <h3 class="metadata-review-heading">검토 대기</h3>
       <div id="metadataReviewList" class="metadata-review-list"></div>
       <h3 class="metadata-review-heading">변경 이력</h3>
@@ -201,6 +204,6 @@
     </div>
   </dialog>
   <div id="toast" class="toast" role="status"></div>
-  <script src="app.js?v=70"></script>
+  <script src="app.js?v=71"></script>
 </body>
 </html>
