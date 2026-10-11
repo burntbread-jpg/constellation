@@ -188,7 +188,8 @@ function mockSupabase(url, init = {}) {
     return response(null, 204);
   }
   if (method === 'GET' && table === 'works') {
-    const id = parsed.searchParams.get('id')?.replace(/^eq\./, '');
+    const raw = parsed.searchParams.get('id'), id = raw?.replace(/^eq\./, '');
+    if(raw?.startsWith('in.(')){const ids=raw.slice(4,-1).split(',');return response(ids.map(value=>state.works.get(value)).filter(Boolean))}
     return response(id ? (state.works.has(id) ? [state.works.get(id)] : []) : [...state.works.values()]);
   }
   if (method === 'POST' && table === 'archive_items') {
@@ -746,6 +747,18 @@ test('duplicate detector groups editions but excludes adaptations and remakes', 
   assert.ok(data.excluded.adaptation>=1);
   assert.ok(data.excluded.remake>=1);
   assert.equal(data.readOnly,true);
+});
+
+test('duplicate merge preview is read-only and reports field conflicts', async()=>{
+  const reviewerId='66666666-6666-4666-8666-666666666666',headers={'oai-authenticated-user-id':reviewerId},reviewerEnv={...env,METADATA_REVIEWER_IDS:reviewerId};
+  state.works.set('book:preview-a',{id:'book:preview-a',title:'미리보기 작품 1권',creator:'작가',release_year:2000,media_type:'BOOK',source:'Open Library'});
+  state.works.set('book:preview-b',{id:'book:preview-b',title:'미리보기 작품 세트',creator:'작가',release_year:2001,media_type:'MANGA',source:'Google Books'});
+  const result=await worker.fetch(new Request('https://site.test/api/duplicate-preview?left=book%3Apreview-a&right=book%3Apreview-b',{headers}),reviewerEnv),data=await result.json();
+  assert.equal(result.status,200);
+  assert.equal(data.readOnly,true);
+  assert.equal(data.canMerge,false);
+  assert.equal(data.nextStep,'46-3');
+  assert.ok(data.comparison.some(item=>item.field==='source'&&item.conflict));
 });
 
 test('archive lifecycle creates Taste DNA, aggregates it, and deletes it', async () => {

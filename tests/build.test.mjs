@@ -110,3 +110,12 @@ test('review dashboard presents duplicate detection as a read-only operation', a
   assert.match(core,/읽기 전용 탐지 결과 · 병합되지 않음/);
   assert.match(core,/각색.*리메이크.*제외/);
 });
+
+test('duplicate preview compares fields and impact without enabling merge', async()=>{
+  const html=await readFile(new URL('../dist/client/index.html',import.meta.url),'utf8');
+  const core=await readFile(new URL('../src/client/01-core.js',import.meta.url),'utf8');
+  assert.match(html,/id="duplicatePreviewDialog"/);
+  assert.match(core,/\/api\/duplicate-preview/);
+  assert.match(core,/대표 작품 선택\(미리보기\)/);
+  assert.match(core,/46-3단계에서 승인·병합 가능/);
+});
