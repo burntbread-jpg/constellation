@@ -50,3 +50,11 @@ test('PWA shell and HTML request the same current client bundle', async () => {
   assert.match(worker, new RegExp(`app\\.js\\?v=${version}`));
   assert.match(worker, new RegExp(`taste-constellation-shell-v${version}`));
 });
+
+test('work details diagnose incomplete metadata and link each gap to a correction report', async () => {
+  const core = await readFile(new URL('../src/client/01-core.js', import.meta.url), 'utf8');
+  const events = await readFile(new URL('../src/client/04-events.js', import.meta.url), 'utf8');
+  assert.match(core, /function metadataCompleteness\(w\)/);
+  assert.match(core, /data-metadata-missing/);
+  assert.match(events, /openMetadataReport\(button\.dataset\.metadataMissing\)/);
+});
