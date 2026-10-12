@@ -25,6 +25,7 @@ const state = {
   metadataReports: [],
   metadataChanges: [],
   duplicateMerges: [],
+  identityExceptions: [],
   catalogQueries: [],
   profileWrites: 0,
   backfillCalls: 0,
@@ -153,6 +154,11 @@ function mockSupabase(url, init = {}) {
     const audit=state.duplicateMerges.find(row=>Number(row.id)===Number(body.p_audit_id));if(!audit)return response({message:'merge audit not found'},400);if(audit.restored_at)return response({message:'merge already restored'},400);if(!state.works.has(audit.target_work_id))return response({message:'merge target is missing'},400);if(state.works.has(audit.removed_work_id))return response({message:'removed work already exists'},400);state.works.set(audit.removed_work_id,{...audit.removed_snapshot});audit.restored_at=new Date().toISOString();audit.restored_by=body.p_reviewer_id;audit.restore_reason=body.p_reason;return response({audit_id:audit.id,target_id:audit.target_work_id,restored_id:audit.removed_work_id,catalog_restored:true,personalization_split:false});
   }
   if(method==='GET'&&table==='duplicate_work_merges')return response(parsed.searchParams.get('restored_at')==='not.is.null'?state.duplicateMerges.filter(row=>row.restored_at):state.duplicateMerges);
+  if(method==='GET'&&table==='work_identity_exceptions'){
+    const left=parsed.searchParams.get('left_work_id')?.replace(/^eq\./,''),right=parsed.searchParams.get('right_work_id')?.replace(/^eq\./,'');return response(state.identityExceptions.filter(row=>(!left||row.left_work_id===left)&&(!right||row.right_work_id===right)));
+  }
+  if(method==='POST'&&table==='work_identity_exceptions'){const row={...body,id:state.identityExceptions.length+1,created_at:new Date().toISOString()};state.identityExceptions.push(row);return response([row],201)}
+  if(method==='DELETE'&&table==='work_identity_exceptions'){const id=Number(parsed.searchParams.get('id')?.replace(/^eq\./,''));state.identityExceptions=state.identityExceptions.filter(row=>Number(row.id)!==id);return response(null,204)}
   if (method === 'POST' && table === 'recommendation_feedback') {
     state.feedback.set(`${body.user_id}:${body.from_work_id}:${body.to_work_id}:${body.connection_mode}`, body);
     return response(null, 204);
@@ -763,6 +769,17 @@ test('duplicate detector groups editions but excludes adaptations and remakes', 
   assert.ok(data.excluded.adaptation>=1);
   assert.ok(data.excluded.remake>=1);
   assert.equal(data.readOnly,true);
+});
+
+test('reviewer can manage identity exceptions that suppress detection and block merging',async()=>{
+  const reviewerId='66666666-6666-4666-8666-666666666666',reviewerHeaders={'oai-authenticated-user-id':reviewerId,'content-type':'application/json'},reviewerEnv={...env,METADATA_REVIEWER_IDS:reviewerId};
+  state.works.set('book:identity-a',{id:'book:identity-a',title:'같은 이름',creator:'작가',release_year:2001,media_type:'BOOK',source:'Open Library'});
+  state.works.set('book:identity-b',{id:'book:identity-b',title:'같은 이름 세트',creator:'작가',release_year:2001,media_type:'MANGA',source:'Google Books'});
+  const saved=await worker.fetch(new Request('https://site.test/api/identity-exceptions',{method:'POST',headers:reviewerHeaders,body:JSON.stringify({leftId:'book:identity-b',rightId:'book:identity-a',reasonType:'distinct_edition',note:'내용이 다른 별개의 판본'})}),reviewerEnv),savedData=await saved.json();assert.equal(saved.status,201);assert.equal(savedData.saved,true);
+  const list=await worker.fetch(new Request('https://site.test/api/identity-exceptions',{headers:reviewerHeaders}),reviewerEnv),listData=await list.json();assert.ok(listData.items.some(item=>item.id===savedData.id&&item.left.title));
+  const candidates=await worker.fetch(new Request('https://site.test/api/duplicate-candidates',{headers:reviewerHeaders}),reviewerEnv),candidateData=await candidates.json();assert.equal(candidateData.items.some(item=>item.id.includes('book:identity-a')&&item.id.includes('book:identity-b')),false);assert.ok(candidateData.excluded.exception>=1);
+  const preview=await worker.fetch(new Request('https://site.test/api/duplicate-preview?left=book%3Aidentity-a&right=book%3Aidentity-b',{headers:reviewerHeaders}),reviewerEnv);assert.equal(preview.status,409);assert.equal((await preview.json()).reason,'identity_exception');
+  const removed=await worker.fetch(new Request(`https://site.test/api/identity-exceptions/${savedData.id}`,{method:'DELETE',headers:reviewerHeaders}),reviewerEnv);assert.equal(removed.status,200);assert.equal(state.identityExceptions.length,0);
 });
 
 test('duplicate merge preview is read-only and reports field conflicts', async()=>{

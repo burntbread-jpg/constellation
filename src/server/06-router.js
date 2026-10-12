@@ -69,8 +69,10 @@ async function routeApi(request,env,url){
   if(pathname==='/api/my-metadata-reports')return request.method==='GET'?myMetadataReports(request,env):methodNotAllowed(['GET']);
   if(pathname==='/api/metadata-quality')return request.method==='GET'?metadataQualityDashboard(request,env):methodNotAllowed(['GET']);
   if(pathname==='/api/duplicate-candidates')return request.method==='GET'?duplicateWorkCandidates(request,env):methodNotAllowed(['GET']);
-  if(pathname==='/api/duplicate-preview')return request.method==='GET'?duplicateMergePreview(request,env):methodNotAllowed(['GET']);
-  if(pathname==='/api/duplicate-merge')return request.method==='POST'?mergeDuplicateWorks(request,env):methodNotAllowed(['POST']);
+  if(pathname==='/api/duplicate-preview')return request.method==='GET'?duplicateMergePreviewGuarded(request,env):methodNotAllowed(['GET']);
+  if(pathname==='/api/duplicate-merge')return request.method==='POST'?mergeDuplicateWorksGuarded(request,env):methodNotAllowed(['POST']);
+  if(pathname==='/api/identity-exceptions')return ['GET','POST'].includes(request.method)?identityExceptions(request,env):methodNotAllowed(['GET','POST']);
+  if(pathname.startsWith('/api/identity-exceptions/')){const id=pathname.slice('/api/identity-exceptions/'.length);return request.method==='DELETE'?removeIdentityException(request,env,id):methodNotAllowed(['DELETE'])}
   if(pathname==='/api/duplicate-merges')return request.method==='GET'?duplicateMergeHistory(request,env):methodNotAllowed(['GET']);
   if(pathname.startsWith('/api/duplicate-merges/')){const id=pathname.slice('/api/duplicate-merges/'.length);return request.method==='PATCH'?restoreDuplicateMerge(request,env,id):methodNotAllowed(['PATCH'])}
   if(pathname==='/api/metadata-provenance')return request.method==='GET'?publicMetadata(await publicMetadataProvenance(request,env),300):methodNotAllowed(['GET']);

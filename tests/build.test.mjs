@@ -141,5 +141,14 @@ test('work detail omits the generic culture bridge sentence and restored pairs s
   const core=await readFile(new URL('../src/client/01-core.js',import.meta.url),'utf8');
   const storage=await readFile(new URL('../src/server/02-storage.js',import.meta.url),'utf8');
   assert.doesNotMatch(html,/id="cultureContext"/);assert.doesNotMatch(core,/\$\('#cultureContext'\)/);
-  assert.match(storage,/restoredPairs/);assert.match(core,/복구 판정/);
+  assert.match(storage,/restoredPairs/);assert.match(core,/구분 예외/);
+});
+
+test('review dashboard manages persistent work identity exceptions',async()=>{
+  const html=await readFile(new URL('../dist/client/index.html',import.meta.url),'utf8');
+  const core=await readFile(new URL('../src/client/01-core.js',import.meta.url),'utf8');
+  const router=await readFile(new URL('../src/server/06-router.js',import.meta.url),'utf8');
+  const migration=await readFile(new URL('../supabase/migrations/20261012_stage50_identity_exceptions.sql',import.meta.url),'utf8');
+  assert.match(html,/id="identityExceptionList"/);assert.match(core,/서로 다른 작품/);assert.match(core,/\/api\/identity-exceptions/);
+  assert.match(router,/identityExceptions/);assert.match(migration,/work_identity_exceptions_pair_idx/);
 });
