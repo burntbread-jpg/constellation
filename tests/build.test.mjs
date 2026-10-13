@@ -171,3 +171,17 @@ test('foreign key paths have covering indexes',async()=>{
     assert.match(source,/metadata_reports_user_idx[\s\S]*metadata_reports\s*\(user_id\)/);
   }
 });
+
+test('server-only tables explicitly deny direct client access',async()=>{
+  const schema=await readFile(new URL('../supabase/schema.sql',import.meta.url),'utf8');
+  const migration=await readFile(new URL('../supabase/migrations/20261013_stage53_explicit_client_denies.sql',import.meta.url),'utf8');
+  const tables=[
+    'archive_items','connections','duplicate_work_merges','metadata_changes',
+    'metadata_reports','recommendation_feedback','taste_tags',
+    'work_identity_exceptions','works'
+  ];
+  for(const source of [schema,migration]){
+    for(const table of tables) assert.match(source,new RegExp(`'${table}'`));
+    assert.match(source,/for all to anon, authenticated using \(false\) with check \(false\)/);
+  }
+});

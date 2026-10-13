@@ -558,3 +558,30 @@ $$;
 
 revoke all on function public.match_work_catalog(extensions.vector, text[], integer) from public, anon, authenticated;
 grant execute on function public.match_work_catalog(extensions.vector, text[], integer) to service_role;
+
+-- Taste Constellation tables are server-only. Grants above remain the primary
+-- boundary; explicit deny policies protect against accidental future grants.
+do $$
+declare
+  table_name text;
+begin
+  foreach table_name in array array[
+    'archive_items',
+    'connections',
+    'duplicate_work_merges',
+    'metadata_changes',
+    'metadata_reports',
+    'recommendation_feedback',
+    'taste_tags',
+    'work_identity_exceptions',
+    'works'
+  ]
+  loop
+    execute format('drop policy if exists %I on public.%I',
+      table_name || '_deny_client_access', table_name);
+    execute format(
+      'create policy %I on public.%I for all to anon, authenticated using (false) with check (false)',
+      table_name || '_deny_client_access', table_name);
+  end loop;
+end
+$$;
