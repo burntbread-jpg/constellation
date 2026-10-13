@@ -192,6 +192,10 @@
       <button class="dialog-close" type="button" aria-label="닫기" onclick="this.closest('dialog').close()">×</button>
       <p class="eyebrow">METADATA REVIEW</p><h2 id="metadataReviewTitle">작품 정보 수정 제안</h2>
       <p class="dialog-lead">승인하면 공용 작품 정보와 저장된 성좌의 메타데이터에 반영됩니다.</p>
+      <section class="operations-health" aria-labelledby="operationsHealthTitle">
+        <header><div><p class="eyebrow">OPERATIONS</p><h3 id="operationsHealthTitle">서비스 운영 상태</h3></div><button id="operationsHealthRefresh" type="button">다시 점검</button></header>
+        <div id="operationsHealthSummary" class="operations-health-summary" role="status" aria-live="polite"><p class="review-empty">운영 상태를 확인하고 있어요.</p></div>
+      </section>
       <h3 class="metadata-review-heading">작품 정보 품질</h3>
       <div id="metadataQualitySummary" class="metadata-quality-summary"><p class="review-empty">정보 완성도를 계산하고 있어요.</p></div>
       <div class="metadata-quality-filters" aria-label="작품 정보 품질 필터">

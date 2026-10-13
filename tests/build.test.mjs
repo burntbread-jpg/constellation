@@ -102,6 +102,18 @@ test('metadata quality queue can batch trusted candidates into review without ap
   assert.match(core,/\/api\/metadata-reports/);
 });
 
+test('review dashboard exposes protected operational health checks', async () => {
+  const html = await readFile(new URL('../dist/client/index.html', import.meta.url), 'utf8');
+  const core = await readFile(new URL('../src/client/01-core.js', import.meta.url), 'utf8');
+  const events = await readFile(new URL('../src/client/04-events.js', import.meta.url), 'utf8');
+  assert.match(html, /id="operationsHealthSummary"/);
+  assert.match(html, /id="operationsHealthRefresh"/);
+  assert.match(core, /\/api\/health\/deep/);
+  assert.match(core, /cache:'no-store'/);
+  assert.match(core, /loadOperationalHealth\(\)/);
+  assert.match(events, /operationsHealthRefresh/);
+});
+
 test('review dashboard presents duplicate detection as a read-only operation', async () => {
   const html=await readFile(new URL('../dist/client/index.html',import.meta.url),'utf8');
   const core=await readFile(new URL('../src/client/01-core.js',import.meta.url),'utf8');
