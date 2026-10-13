@@ -77,7 +77,7 @@ create table if not exists public.metadata_changes (
 alter table public.metadata_changes add column if not exists evidence_type text check (evidence_type in ('official','publisher','award_body','authority_database','reference','other'));
 alter table public.metadata_changes add column if not exists source_url text;
 create or replace function public.fill_metadata_change_provenance()
-returns trigger language plpgsql security definer set search_path = public as $$
+returns trigger language plpgsql security invoker set search_path = '' as $$
 begin
   if new.report_id is not null then
     select evidence_type, source_url into new.evidence_type, new.source_url
@@ -86,6 +86,8 @@ begin
   return new;
 end;
 $$;
+revoke execute on function public.fill_metadata_change_provenance() from public, anon, authenticated;
+grant execute on function public.fill_metadata_change_provenance() to service_role;
 drop trigger if exists metadata_change_provenance on public.metadata_changes;
 create trigger metadata_change_provenance before insert on public.metadata_changes
 for each row execute function public.fill_metadata_change_provenance();

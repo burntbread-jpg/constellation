@@ -152,3 +152,12 @@ test('review dashboard manages persistent work identity exceptions',async()=>{
   assert.match(html,/id="identityExceptionList"/);assert.match(core,/서로 다른 작품/);assert.match(core,/\/api\/identity-exceptions/);
   assert.match(router,/identityExceptions/);assert.match(migration,/work_identity_exceptions_pair_idx/);
 });
+
+test('metadata provenance trigger runs with least privilege',async()=>{
+  const schema=await readFile(new URL('../supabase/schema.sql',import.meta.url),'utf8');
+  const migration=await readFile(new URL('../supabase/migrations/20261013_stage51_harden_metadata_trigger.sql',import.meta.url),'utf8');
+  assert.match(schema,/fill_metadata_change_provenance\(\)[\s\S]*security invoker set search_path = ''/);
+  assert.match(schema,/revoke execute on function public\.fill_metadata_change_provenance\(\) from public, anon, authenticated/);
+  assert.match(migration,/alter function public\.fill_metadata_change_provenance\(\) security invoker/);
+  assert.match(migration,/grant execute on function public\.fill_metadata_change_provenance\(\) to service_role/);
+});
