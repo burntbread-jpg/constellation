@@ -248,7 +248,7 @@ revoke all on public.duplicate_work_merges from anon, authenticated;
 grant all on public.duplicate_work_merges to service_role;
 
 create or replace function public.restore_duplicate_work_merge(p_audit_id bigint,p_reviewer_id text,p_reason text default null) returns jsonb
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = '' as $$
 declare v_audit public.duplicate_work_merges%rowtype; v_removed public.works%rowtype;
 begin
   select * into v_audit from public.duplicate_work_merges where id=p_audit_id for update;
@@ -285,7 +285,7 @@ create or replace function public.save_connections(
 ) returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 begin
   insert into public.connections (
@@ -314,7 +314,7 @@ create or replace function public.backfill_taste_graph(
 ) returns jsonb
 language plpgsql
 security definer
-set search_path = public, extensions
+set search_path = pg_catalog, extensions
 as $$
 declare
   v_vectors integer := 0;
@@ -395,7 +395,7 @@ create or replace function public.save_archive_analysis(
 ) returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 begin
   insert into public.works (
@@ -451,7 +451,7 @@ create or replace function public.taste_similarity_edges(
 )
 language sql
 security definer
-set search_path = public, extensions
+set search_path = pg_catalog, extensions
 stable
 as $$
   select
@@ -476,7 +476,7 @@ create or replace function public.upsert_work_catalog(
 ) returns integer
 language plpgsql
 security definer
-set search_path = public, extensions
+set search_path = ''
 as $$
 declare
   v_count integer := 0;
@@ -542,7 +542,7 @@ create or replace function public.match_work_catalog(
 )
 language sql
 security definer
-set search_path = public, extensions
+set search_path = pg_catalog, extensions
 stable
 as $$
   select

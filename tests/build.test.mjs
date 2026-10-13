@@ -185,3 +185,19 @@ test('server-only tables explicitly deny direct client access',async()=>{
     assert.match(source,/for all to anon, authenticated using \(false\) with check \(false\)/);
   }
 });
+
+test('privileged database functions use only fixed trusted search paths',async()=>{
+  const schema=await readFile(new URL('../supabase/schema.sql',import.meta.url),'utf8');
+  const migration=await readFile(new URL('../supabase/migrations/20261013_stage54_harden_privileged_functions.sql',import.meta.url),'utf8');
+  const functions=[
+    'backfill_taste_graph','match_work_catalog','merge_duplicate_works',
+    'restore_duplicate_work_merge','save_archive_analysis','save_connections',
+    'taste_similarity_edges','upsert_work_catalog'
+  ];
+  assert.doesNotMatch(schema,/security definer set search_path = public(?:\s|,)/);
+  assert.doesNotMatch(schema,/security definer[\s\S]{0,40}set search_path = public(?:\s|,)/);
+  for(const name of functions){
+    assert.match(migration,new RegExp(`alter function public\\.${name}\\([\\s\\S]*?set search_path = (?:''|pg_catalog, extensions)`));
+    assert.match(migration,new RegExp(`revoke all on function public\\.${name}\\(`));
+  }
+});
