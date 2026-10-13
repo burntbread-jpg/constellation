@@ -55,6 +55,7 @@ alter table public.metadata_reports add column if not exists reviewed_by text;
 alter table public.metadata_reports add column if not exists evidence_type text check (evidence_type in ('official','publisher','award_body','authority_database','reference','other'));
 alter table public.metadata_reports add column if not exists source_url text;
 create index if not exists metadata_reports_pending_idx on public.metadata_reports(status, created_at desc);
+create index if not exists metadata_reports_user_idx on public.metadata_reports(user_id);
 alter table public.metadata_reports enable row level security;
 revoke all on public.metadata_reports from anon, authenticated;
 grant all on public.metadata_reports to service_role;
@@ -92,6 +93,7 @@ drop trigger if exists metadata_change_provenance on public.metadata_changes;
 create trigger metadata_change_provenance before insert on public.metadata_changes
 for each row execute function public.fill_metadata_change_provenance();
 create index if not exists metadata_changes_work_idx on public.metadata_changes(work_id, changed_at desc);
+create index if not exists metadata_changes_report_idx on public.metadata_changes(report_id);
 alter table public.metadata_changes enable row level security;
 revoke all on public.metadata_changes from anon, authenticated;
 grant all on public.metadata_changes to service_role;
@@ -182,6 +184,8 @@ alter table public.recommendation_feedback
 
 create index if not exists archive_items_user_created_idx
   on public.archive_items (user_id, created_at desc);
+create index if not exists archive_items_work_idx
+  on public.archive_items (work_id);
 create index if not exists archive_items_user_state_idx
   on public.archive_items (user_id, archive_state, updated_at desc);
 

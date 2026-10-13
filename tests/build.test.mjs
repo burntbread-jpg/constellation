@@ -161,3 +161,13 @@ test('metadata provenance trigger runs with least privilege',async()=>{
   assert.match(migration,/alter function public\.fill_metadata_change_provenance\(\) security invoker/);
   assert.match(migration,/grant execute on function public\.fill_metadata_change_provenance\(\) to service_role/);
 });
+
+test('foreign key paths have covering indexes',async()=>{
+  const schema=await readFile(new URL('../supabase/schema.sql',import.meta.url),'utf8');
+  const migration=await readFile(new URL('../supabase/migrations/20261013_stage52_index_foreign_keys.sql',import.meta.url),'utf8');
+  for(const source of [schema,migration]){
+    assert.match(source,/archive_items_work_idx[\s\S]*archive_items\s*\(work_id\)/);
+    assert.match(source,/metadata_changes_report_idx[\s\S]*metadata_changes\s*\(report_id\)/);
+    assert.match(source,/metadata_reports_user_idx[\s\S]*metadata_reports\s*\(user_id\)/);
+  }
+});
