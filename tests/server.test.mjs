@@ -445,6 +445,9 @@ test('deep health verifies Supabase and pgvector without exposing it publicly', 
   assert.equal(data.ok, true);
   assert.equal(data.status, 'ready');
   assert.deepEqual(data.checks, {database: true, pgvector: true, catalogReadable: true, vectorRpcReadable: true});
+  assert.deepEqual(data.providers, {openLibrary: 'ok', aniList: 'ok', tmdb: 'not_configured', googleBooks: 'not_configured'});
+  assert.equal(data.traffic.windowMinutes, 5);
+  assert.equal(typeof data.traffic.errorRate, 'number');
   assert.equal(data.dimensions, 25);
   assert.equal(typeof data.latencyMs, 'number');
 
@@ -454,8 +457,23 @@ test('deep health verifies Supabase and pgvector without exposing it publicly', 
   const degradedData = await degraded.json();
   assert.equal(degradedData.ok, false);
   assert.equal(degradedData.status, 'degraded');
-  assert.deepEqual(degradedData.checks, {database: false, pgvector: false});
+  assert.deepEqual(degradedData.checks, {database: false, pgvector: false, catalogReadable: false, vectorRpcReadable: false});
   assert.equal('error' in degradedData, false);
+});
+
+test('deep health reports provider outages as warnings while core services stay ready', async () => {
+  const reviewerId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', reviewerEnv = {...env, METADATA_REVIEWER_IDS: reviewerId};
+  state.failProviders = true;
+  const result = await worker.fetch(new Request('https://site.test/api/health/deep', {headers: {'oai-authenticated-user-id': reviewerId}}), reviewerEnv);
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.ok, true);
+  assert.equal(data.status, 'warning');
+  assert.equal(data.checks.database, true);
+  assert.equal(data.checks.pgvector, true);
+  assert.equal(data.providers.openLibrary, 'error');
+  assert.equal(data.providers.aniList, 'error');
+  assert.equal('error' in data, false);
 });
 
 test('API routing distinguishes missing paths and unsupported methods', async () => {

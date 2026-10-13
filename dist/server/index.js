@@ -208,6 +208,18 @@ const SECURITY_HEADERS={
   'strict-transport-security':'max-age=31536000; includeSubDomains'
 };
 const RATE_BUCKETS=new Map;
+const API_HEALTH_METRICS={windowMs:300000,events:[]};
+
+function recordApiHealth(status,durationMs){
+  const now=Date.now();
+  API_HEALTH_METRICS.events.push({at:now,error:status>=500,slow:durationMs>=2000});
+  API_HEALTH_METRICS.events=API_HEALTH_METRICS.events.filter(event=>now-event.at<=API_HEALTH_METRICS.windowMs).slice(-500);
+}
+
+function apiHealthSnapshot(){
+  const now=Date.now(),events=API_HEALTH_METRICS.events.filter(event=>now-event.at<=API_HEALTH_METRICS.windowMs),total=events.length,errors=events.filter(event=>event.error).length,slow=events.filter(event=>event.slow).length;
+  return{windowMinutes:5,total,errors,slow,errorRate:total?Number((errors/total).toFixed(3)):0};
+}
 
 function requestId(request){
   const supplied=request.headers.get('x-request-id');
@@ -264,30 +276,30 @@ async function deepHealth(request,env){
   if(!await currentUser(request))return json({error:'로그인이 필요합니다.'},401);
   if(!metadataReviewer(request,env))return json({error:'검수 권한이 없습니다.'},403);
   if(!dbReady(env))return json({ok:false,status:'unconfigured',checks:{database:false,pgvector:false}},503);
-  const startedAt=performance.now(),zeroVector=`[${Array(LEXICON.length).fill('0').join(',')}]`;
-  try{
-    const [catalog,matches]=await Promise.all([
-      supabase(env,'works?select=id&limit=1'),
-      supabase(env,'rpc/match_work_catalog',{method:'POST',body:{p_query:zeroVector,p_excluded:[],p_limit:1}})
-    ]);
-    return json({
-      ok:true,
-      status:'ready',
-      checks:{database:true,pgvector:true,catalogReadable:Array.isArray(catalog),vectorRpcReadable:Array.isArray(matches)},
-      latencyMs:Math.round(performance.now()-startedAt),
-      dimensions:LEXICON.length,
-      checkedAt:new Date().toISOString()
-    });
-  }catch(error){
-    console.error('Deep health check failed',{message:error instanceof Error?error.message:String(error)});
-    return json({
-      ok:false,
-      status:'degraded',
-      checks:{database:false,pgvector:false},
-      latencyMs:Math.round(performance.now()-startedAt),
-      checkedAt:new Date().toISOString()
-    },503);
-  }
+  const startedAt=performance.now(),zeroVector=`[${Array(LEXICON.length).fill('0').join(',')}]`,providerJobs={
+    openLibrary:openLibrary('The Little Prince'),
+    aniList:aniList('Cowboy Bebop'),
+    ...(env.TMDB_READ_TOKEN?{tmdb:tmdb('Inception',env)}:{}),
+    ...(env.GOOGLE_BOOKS_API_KEY?{googleBooks:googleBooks('1984',env)}:{})
+  };
+  const [catalogResult,vectorResult,...providerResults]=await Promise.allSettled([
+    supabase(env,'works?select=id&limit=1'),
+    supabase(env,'rpc/match_work_catalog',{method:'POST',body:{p_query:zeroVector,p_excluded:[],p_limit:1}}),
+    ...Object.values(providerJobs)
+  ]),providerNames=Object.keys(providerJobs),providers={openLibrary:'error',aniList:'error',tmdb:env.TMDB_READ_TOKEN?'error':'not_configured',googleBooks:env.GOOGLE_BOOKS_API_KEY?'error':'not_configured'};
+  providerResults.forEach((result,index)=>providers[providerNames[index]]=result.status==='fulfilled'?'ok':'error');
+  const database=catalogResult.status==='fulfilled'&&Array.isArray(catalogResult.value),pgvector=vectorResult.status==='fulfilled'&&Array.isArray(vectorResult.value),traffic=apiHealthSnapshot(),providerFailures=Object.values(providers).filter(value=>value==='error').length,trafficWarning=traffic.total>=5&&traffic.errorRate>=.1,coreReady=database&&pgvector,status=!coreReady?'degraded':providerFailures||trafficWarning?'warning':'ready';
+  if(!coreReady)console.error('Deep health check failed',{database,pgvector});
+  return json({
+    ok:coreReady,
+    status,
+    checks:{database,pgvector,catalogReadable:database,vectorRpcReadable:pgvector},
+    providers,
+    traffic,
+    latencyMs:Math.round(performance.now()-startedAt),
+    dimensions:LEXICON.length,
+    checkedAt:new Date().toISOString()
+  },coreReady?200:503);
 }
 
 async function routeApi(request,env,url){
@@ -354,6 +366,8 @@ export default{
       const response=url.pathname.startsWith('/api/')
         ?rejected||await routeApi(request,env,url)
         :env.ASSETS?await env.ASSETS.fetch(request):new Response('Not found',{status:404});
+      const duration=performance.now()-startedAt;
+      if(url.pathname.startsWith('/api/'))recordApiHealth(response.status,duration);
       return finishResponse(response,id,startedAt);
     }catch(error){
       console.error('Request failed',{
@@ -361,7 +375,9 @@ export default{
         message:error instanceof Error?error.message:String(error),
         stack:error instanceof Error?error.stack:undefined
       });
-      return finishResponse(json({error:'요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.',requestId:id},500),id,startedAt);
+      const response=json({error:'요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.',requestId:id},500);
+      recordApiHealth(response.status,performance.now()-startedAt);
+      return finishResponse(response,id,startedAt);
     }
   }
 };

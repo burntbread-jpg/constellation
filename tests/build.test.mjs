@@ -111,6 +111,9 @@ test('review dashboard exposes protected operational health checks', async () =>
   assert.match(core, /\/api\/health\/deep/);
   assert.match(core, /cache:'no-store'/);
   assert.match(core, /loadOperationalHealth\(\)/);
+  assert.match(core, /scheduleOperationalHealth/);
+  assert.match(core, /60000/);
+  assert.match(core, /API 5XX/);
   assert.match(events, /operationsHealthRefresh/);
 });
 
