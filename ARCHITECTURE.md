@@ -15,4 +15,9 @@ The source modules are concatenated deliberately. This preserves the existing br
 - `npm test` — run API, recommendation, data-integrity, and build-drift tests.
 - `npm run check` — rebuild and run the complete suite before deployment.
 
+## Operational health
+
+- `GET /api/health` reports public configuration availability without making external calls.
+- `GET /api/health/deep` is restricted to configured metadata reviewers and performs live Supabase table and pgvector RPC checks. It returns only readiness flags and latency, never credentials, row data, or database error details.
+
 Do not edit generated `dist/client/app.js` or `dist/server/index.js` directly. Change the corresponding `src/` module, then rebuild.

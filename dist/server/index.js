@@ -260,6 +260,36 @@ async function publicMetadata(response,maxAge){
   return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
 }
 
+async function deepHealth(request,env){
+  if(!await currentUser(request))return json({error:'로그인이 필요합니다.'},401);
+  if(!metadataReviewer(request,env))return json({error:'검수 권한이 없습니다.'},403);
+  if(!dbReady(env))return json({ok:false,status:'unconfigured',checks:{database:false,pgvector:false}},503);
+  const startedAt=performance.now(),zeroVector=`[${Array(LEXICON.length).fill('0').join(',')}]`;
+  try{
+    const [catalog,matches]=await Promise.all([
+      supabase(env,'works?select=id&limit=1'),
+      supabase(env,'rpc/match_work_catalog',{method:'POST',body:{p_query:zeroVector,p_excluded:[],p_limit:1}})
+    ]);
+    return json({
+      ok:true,
+      status:'ready',
+      checks:{database:true,pgvector:true,catalogReadable:Array.isArray(catalog),vectorRpcReadable:Array.isArray(matches)},
+      latencyMs:Math.round(performance.now()-startedAt),
+      dimensions:LEXICON.length,
+      checkedAt:new Date().toISOString()
+    });
+  }catch(error){
+    console.error('Deep health check failed',{message:error instanceof Error?error.message:String(error)});
+    return json({
+      ok:false,
+      status:'degraded',
+      checks:{database:false,pgvector:false},
+      latencyMs:Math.round(performance.now()-startedAt),
+      checkedAt:new Date().toISOString()
+    },503);
+  }
+}
+
 async function routeApi(request,env,url){
   const {pathname}=url;
   if(pathname==='/api/search')return request.method==='GET'?publicMetadata(await search(request,env),300):methodNotAllowed(['GET']);
@@ -296,6 +326,7 @@ async function routeApi(request,env,url){
     if(request.method==='DELETE')return removeArchive(request,env,id);
     return methodNotAllowed(['PATCH','DELETE']);
   }
+  if(pathname==='/api/health/deep')return request.method==='GET'?deepHealth(request,env):methodNotAllowed(['GET']);
   if(pathname==='/api/health'){
     if(request.method!=='GET')return methodNotAllowed(['GET']);
     return json({

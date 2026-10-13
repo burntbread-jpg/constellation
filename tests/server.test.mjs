@@ -30,6 +30,7 @@ const state = {
   profileWrites: 0,
   backfillCalls: 0,
   failProfiles: false,
+  failHealth: false,
   failProviders: false
 };
 
@@ -61,6 +62,8 @@ function mockSupabase(url, init = {}) {
   const table = parsed.pathname.split('/').at(-1);
   const method = init.method || 'GET';
   const body = init.body ? JSON.parse(init.body) : null;
+
+  if (state.failHealth) return response({message: 'database unavailable'}, 500);
 
   if (method === 'POST' && table === 'profiles') {
     if (state.failProfiles) return response({message: 'profile storage unavailable'}, 500);
@@ -394,6 +397,7 @@ test.beforeEach(() => {
   state.profileWrites = 0;
   state.backfillCalls = 0;
   state.failProfiles = false;
+  state.failHealth = false;
   state.failProviders = false;
 });
 
@@ -424,6 +428,34 @@ test('health reports free providers and configured persistence', async () => {
   assert.equal(data.sources.recommendationEngine, 'pgvector-catalog-feedback-v1');
   assert.equal(data.sources.archiveEngine, 'archive-management-v1');
   assert.equal(data.sources.catalogDimensions, 25);
+});
+
+test('deep health verifies Supabase and pgvector without exposing it publicly', async () => {
+  const anonymous = await worker.fetch(new Request('https://site.test/api/health/deep'), env);
+  assert.equal(anonymous.status, 401);
+  const ordinary = await worker.fetch(new Request('https://site.test/api/health/deep', {headers}), env);
+  assert.equal(ordinary.status, 403);
+
+  const reviewerId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const reviewerEnv = {...env, METADATA_REVIEWER_IDS: reviewerId};
+  const reviewerHeaders = {'oai-authenticated-user-id': reviewerId};
+  const healthy = await worker.fetch(new Request('https://site.test/api/health/deep', {headers: reviewerHeaders}), reviewerEnv);
+  assert.equal(healthy.status, 200);
+  const data = await healthy.json();
+  assert.equal(data.ok, true);
+  assert.equal(data.status, 'ready');
+  assert.deepEqual(data.checks, {database: true, pgvector: true, catalogReadable: true, vectorRpcReadable: true});
+  assert.equal(data.dimensions, 25);
+  assert.equal(typeof data.latencyMs, 'number');
+
+  state.failHealth = true;
+  const degraded = await worker.fetch(new Request('https://site.test/api/health/deep', {headers: reviewerHeaders}), reviewerEnv);
+  assert.equal(degraded.status, 503);
+  const degradedData = await degraded.json();
+  assert.equal(degradedData.ok, false);
+  assert.equal(degradedData.status, 'degraded');
+  assert.deepEqual(degradedData.checks, {database: false, pgvector: false});
+  assert.equal('error' in degradedData, false);
 });
 
 test('API routing distinguishes missing paths and unsupported methods', async () => {
