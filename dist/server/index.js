@@ -221,6 +221,20 @@ function apiHealthSnapshot(){
   return{windowMinutes:5,total,errors,slow,errorRate:total?Number((errors/total).toFixed(3)):0};
 }
 
+async function healthHistory(env,snapshot){
+  try{
+    const checkedAt=new Date().toISOString(),retentionCutoff=new Date(Date.now()-30*86400000).toISOString();
+    await supabase(env,'health_check_runs',{method:'POST',prefer:'return=minimal',body:{status:snapshot.status,database_ready:snapshot.checks.database,pgvector_ready:snapshot.checks.pgvector,provider_failures:Object.values(snapshot.providers).filter(value=>value==='error').length,providers:snapshot.providers,traffic:snapshot.traffic,latency_ms:snapshot.latencyMs,checked_at:checkedAt}});
+    await supabase(env,`health_check_runs?checked_at=lt.${encodeURIComponent(retentionCutoff)}`,{method:'DELETE',prefer:'return=minimal'});
+    const since=new Date(Date.now()-86400000).toISOString(),rows=await supabase(env,`health_check_runs?checked_at=gte.${encodeURIComponent(since)}&select=status,database_ready,pgvector_ready,provider_failures,latency_ms,checked_at&order=checked_at.desc&limit=1440`),items=(rows||[]).slice(0,12),issues=(rows||[]).filter(row=>row.status!=='ready').length;
+    let consecutiveIssues=0;for(const row of rows||[]){if(row.status==='ready')break;consecutiveIssues++}
+    return{available:true,windowHours:24,total:(rows||[]).length,issues,consecutiveIssues,lastRecoveredAt:(rows||[]).find(row=>row.status==='ready')?.checked_at||null,items};
+  }catch(error){
+    console.error('Health history unavailable',{message:error instanceof Error?error.message:String(error)});
+    return{available:false,windowHours:24,total:0,issues:0,consecutiveIssues:0,lastRecoveredAt:null,items:[]};
+  }
+}
+
 function requestId(request){
   const supplied=request.headers.get('x-request-id');
   if(supplied&&/^[a-zA-Z0-9._:-]{8,80}$/.test(supplied))return supplied;
@@ -290,7 +304,7 @@ async function deepHealth(request,env){
   providerResults.forEach((result,index)=>providers[providerNames[index]]=result.status==='fulfilled'?'ok':'error');
   const database=catalogResult.status==='fulfilled'&&Array.isArray(catalogResult.value),pgvector=vectorResult.status==='fulfilled'&&Array.isArray(vectorResult.value),traffic=apiHealthSnapshot(),providerFailures=Object.values(providers).filter(value=>value==='error').length,trafficWarning=traffic.total>=5&&traffic.errorRate>=.1,coreReady=database&&pgvector,status=!coreReady?'degraded':providerFailures||trafficWarning?'warning':'ready';
   if(!coreReady)console.error('Deep health check failed',{database,pgvector});
-  return json({
+  const snapshot={
     ok:coreReady,
     status,
     checks:{database,pgvector,catalogReadable:database,vectorRpcReadable:pgvector},
@@ -299,7 +313,8 @@ async function deepHealth(request,env){
     latencyMs:Math.round(performance.now()-startedAt),
     dimensions:LEXICON.length,
     checkedAt:new Date().toISOString()
-  },coreReady?200:503);
+  },history=coreReady?await healthHistory(env,snapshot):{available:false,windowHours:24,total:0,issues:0,consecutiveIssues:0,lastRecoveredAt:null,items:[]};
+  return json({...snapshot,history},coreReady?200:503);
 }
 
 async function routeApi(request,env,url){

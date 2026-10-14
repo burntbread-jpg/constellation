@@ -26,6 +26,7 @@ const state = {
   metadataChanges: [],
   duplicateMerges: [],
   identityExceptions: [],
+  healthChecks: [],
   catalogQueries: [],
   profileWrites: 0,
   backfillCalls: 0,
@@ -64,6 +65,12 @@ function mockSupabase(url, init = {}) {
   const body = init.body ? JSON.parse(init.body) : null;
 
   if (state.failHealth) return response({message: 'database unavailable'}, 500);
+
+  if(method==='POST'&&table==='health_check_runs'){
+    const row={...body,id:state.healthChecks.length+1};state.healthChecks.unshift(row);return response(null,204);
+  }
+  if(method==='GET'&&table==='health_check_runs')return response(state.healthChecks);
+  if(method==='DELETE'&&table==='health_check_runs')return response(null,204);
 
   if (method === 'POST' && table === 'profiles') {
     if (state.failProfiles) return response({message: 'profile storage unavailable'}, 500);
@@ -394,6 +401,7 @@ test.beforeEach(() => {
   state.feedback.clear();
   state.metadataReports = [];
   state.metadataChanges = [];
+  state.healthChecks = [];
   state.profileWrites = 0;
   state.backfillCalls = 0;
   state.failProfiles = false;
@@ -448,6 +456,9 @@ test('deep health verifies Supabase and pgvector without exposing it publicly', 
   assert.deepEqual(data.providers, {openLibrary: 'ok', aniList: 'ok', tmdb: 'not_configured', googleBooks: 'not_configured'});
   assert.equal(data.traffic.windowMinutes, 5);
   assert.equal(typeof data.traffic.errorRate, 'number');
+  assert.equal(data.history.available, true);
+  assert.equal(data.history.total, 1);
+  assert.equal(data.history.consecutiveIssues, 0);
   assert.equal(data.dimensions, 25);
   assert.equal(typeof data.latencyMs, 'number');
 
@@ -473,6 +484,8 @@ test('deep health reports provider outages as warnings while core services stay 
   assert.equal(data.checks.pgvector, true);
   assert.equal(data.providers.openLibrary, 'error');
   assert.equal(data.providers.aniList, 'error');
+  assert.equal(data.history.available, true);
+  assert.equal(data.history.consecutiveIssues, 1);
   assert.equal('error' in data, false);
 });
 

@@ -21,5 +21,6 @@ The source modules are concatenated deliberately. This preserves the existing br
 - `GET /api/health/deep` is restricted to configured metadata reviewers and performs live Supabase table and pgvector RPC checks. It returns only readiness flags and latency, never credentials, row data, or database error details.
 - The metadata review dialog renders those deep-check readiness flags as an operator dashboard and supports an explicit no-cache refresh. Authorization remains enforced by the server endpoint.
 - Deep health also probes configured/free metadata providers and reports a rolling five-minute API 5xx/slow-request snapshot. Provider outages are warnings while database or pgvector failures are service degradation; the reviewer dashboard refreshes automatically every 60 seconds while open.
+- Successful core health probes are retained for 30 days in a service-role-only table. The dashboard summarizes the latest 24 hours and highlights three or more consecutive warning/degraded checks without storing visitor identity or request payloads.
 
 Do not edit generated `dist/client/app.js` or `dist/server/index.js` directly. Change the corresponding `src/` module, then rebuild.

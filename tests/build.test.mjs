@@ -114,7 +114,18 @@ test('review dashboard exposes protected operational health checks', async () =>
   assert.match(core, /scheduleOperationalHealth/);
   assert.match(core, /60000/);
   assert.match(core, /API 5XX/);
+  assert.match(core, /24시간 점검 이력/);
+  assert.match(core, /consecutiveIssues/);
   assert.match(events, /operationsHealthRefresh/);
+});
+
+test('health check history is private, indexed, and retained by the service', async () => {
+  const migration = await readFile(new URL('../supabase/migrations/20261014_stage58_health_check_history.sql', import.meta.url), 'utf8');
+  assert.match(migration, /create table if not exists public\.health_check_runs/);
+  assert.match(migration, /enable row level security/);
+  assert.match(migration, /revoke all on public\.health_check_runs from anon, authenticated/);
+  assert.match(migration, /grant all on public\.health_check_runs to service_role/);
+  assert.match(migration, /health_check_runs_checked_at_idx/);
 });
 
 test('review dashboard presents duplicate detection as a read-only operation', async () => {
