@@ -588,9 +588,13 @@ create table if not exists public.health_alert_events (
   delivery_attempts integer not null default 0 check (delivery_attempts >= 0),
   delivered_at timestamptz,
   last_delivery_error text,
+  acknowledged_at timestamptz,
+  acknowledged_by uuid,
+  resolution_note text check (resolution_note is null or char_length(resolution_note) between 5 and 500),
   created_at timestamptz not null default now()
 );
 create index if not exists health_alert_events_pending_idx on public.health_alert_events (created_at) where delivered_at is null;
+create index if not exists health_alert_events_unacknowledged_idx on public.health_alert_events (created_at desc) where acknowledged_at is null;
 alter table public.health_alert_events enable row level security;
 revoke all on public.health_alert_events from anon, authenticated;
 grant all on public.health_alert_events to service_role;

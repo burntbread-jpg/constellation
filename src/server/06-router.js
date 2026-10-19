@@ -76,20 +76,39 @@ async function deliverHealthAlerts(env){
 
 async function healthAlertHistory(env){
   try{
-    const rows=await supabase(env,'health_alert_events?select=kind,status,message,delivery_attempts,delivered_at,last_delivery_error,created_at&order=created_at.desc&limit=20')||[],items=rows.map(row=>({
+    const rows=await supabase(env,'health_alert_events?select=id,kind,status,message,delivery_attempts,delivered_at,last_delivery_error,acknowledged_at,resolution_note,created_at&order=created_at.desc&limit=20')||[],items=rows.map(row=>({
+      id:row.id,
       kind:row.kind,
       status:row.status,
       message:row.message,
       deliveryStatus:row.delivered_at?'delivered':row.last_delivery_error?'failed':'pending',
       attempts:Number(row.delivery_attempts||0),
       createdAt:row.created_at,
-      deliveredAt:row.delivered_at||null
+      deliveredAt:row.delivered_at||null,
+      acknowledged:Boolean(row.acknowledged_at),
+      acknowledgedAt:row.acknowledged_at||null,
+      resolutionNote:row.resolution_note||null
     }));
-    return{available:true,total:items.length,pending:items.filter(item=>item.deliveryStatus==='pending').length,failed:items.filter(item=>item.deliveryStatus==='failed').length,items};
+    return{available:true,total:items.length,pending:items.filter(item=>item.deliveryStatus==='pending').length,failed:items.filter(item=>item.deliveryStatus==='failed').length,unacknowledged:items.filter(item=>!item.acknowledged).length,items};
   }catch(error){
     console.error('Health alert history unavailable',{message:error instanceof Error?error.message:String(error)});
-    return{available:false,total:0,pending:0,failed:0,items:[]};
+    return{available:false,total:0,pending:0,failed:0,unacknowledged:0,items:[]};
   }
+}
+
+async function acknowledgeHealthAlert(request,env,id){
+  const user=await currentUser(request);
+  if(!user)return json({error:'로그인이 필요합니다.'},401);
+  if(!metadataReviewer(request,env))return json({error:'검수 권한이 없습니다.'},403);
+  if(!/^\d+$/.test(id))return json({error:'운영 알림 ID가 올바르지 않습니다.'},400);
+  let payload;
+  try{payload=await request.json()}catch{return json({error:'JSON 요청 본문이 올바르지 않습니다.'},400)}
+  if(payload?.confirmation!=='ACKNOWLEDGE_ALERT')return json({error:'알림 확인 문구가 필요합니다.'},400);
+  const note=String(payload?.note||'').trim().slice(0,500);
+  if(note.length<5)return json({error:'조치 메모를 5자 이상 입력해 주세요.'},400);
+  const acknowledgedAt=new Date().toISOString(),rows=await supabase(env,`health_alert_events?id=eq.${encodeURIComponent(id)}&acknowledged_at=is.null`,{method:'PATCH',prefer:'return=representation',body:{acknowledged_at:acknowledgedAt,acknowledged_by:user.id,resolution_note:note}}),row=rows?.[0];
+  if(!row)return json({error:'이미 확인했거나 존재하지 않는 운영 알림입니다.'},404);
+  return json({acknowledged:true,id:Number(id),acknowledgedAt,resolutionNote:note});
 }
 
 function secureTokenMatch(left,right){
@@ -233,6 +252,7 @@ async function routeApi(request,env,url){
     return methodNotAllowed(['PATCH','DELETE']);
   }
   if(pathname==='/api/health/deep')return request.method==='GET'?deepHealth(request,env):methodNotAllowed(['GET']);
+  if(pathname.startsWith('/api/health/alerts/')){const id=pathname.slice('/api/health/alerts/'.length);return request.method==='PATCH'?acknowledgeHealthAlert(request,env,id):methodNotAllowed(['PATCH'])}
   if(pathname==='/api/health/scheduled')return request.method==='POST'?scheduledHealth(request,env):methodNotAllowed(['POST']);
   if(pathname==='/api/health'){
     if(request.method!=='GET')return methodNotAllowed(['GET']);

@@ -154,6 +154,22 @@ test('reviewer operations dashboard renders durable health alert history', async
   assert.match(css,/\.operations-alerts/);
 });
 
+test('operational alerts support private reviewer acknowledgement and resolution notes', async () => {
+  const server=await readFile(new URL('../src/server/06-router.js',import.meta.url),'utf8');
+  const core=await readFile(new URL('../src/client/01-core.js',import.meta.url),'utf8');
+  const events=await readFile(new URL('../src/client/04-events.js',import.meta.url),'utf8');
+  const css=await readFile(new URL('../dist/client/metadata.css',import.meta.url),'utf8');
+  const migration=await readFile(new URL('../supabase/migrations/20261019_stage61_alert_acknowledgement.sql',import.meta.url),'utf8');
+  assert.match(server,/acknowledgeHealthAlert/);
+  assert.match(server,/ACKNOWLEDGE_ALERT/);
+  assert.match(server,/acknowledged_by:user\.id/);
+  assert.match(core,/data-health-alert-ack/);
+  assert.match(events,/acknowledgeHealthAlert/);
+  assert.match(css,/article\.acknowledged/);
+  assert.match(migration,/health_alert_events_unacknowledged_idx/);
+  assert.match(migration,/revoke all on public\.health_alert_events from anon, authenticated/);
+});
+
 test('review dashboard presents duplicate detection as a read-only operation', async () => {
   const html=await readFile(new URL('../dist/client/index.html',import.meta.url),'utf8');
   const core=await readFile(new URL('../src/client/01-core.js',import.meta.url),'utf8');

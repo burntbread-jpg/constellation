@@ -25,5 +25,6 @@ The source modules are concatenated deliberately. This preserves the existing br
 - Supabase Cron calls `POST /api/health/scheduled` every five minutes with Vault-backed monitor and Sites service-access tokens, so checks continue while the dashboard is closed. The endpoint is not authorized by visitor identity.
 - Alert events are durable and service-role-only. A configured Slack/Discord-compatible webhook is notified only when the service first degrades, a warning persists for three checks, or a non-ready state recovers; failed deliveries remain queued for the next scheduled run.
 - The reviewer operations panel shows the latest sanitized alert history, including pending or failed delivery state, without exposing webhook URLs, provider payloads, or raw delivery errors.
+- Reviewers can acknowledge an operational alert with a required resolution note. Acknowledgement time and reviewer identity are retained in the service-role-only alert table, while the dashboard exposes only the note and timestamp.
 
 Do not edit generated `dist/client/app.js` or `dist/server/index.js` directly. Change the corresponding `src/` module, then rebuild.
