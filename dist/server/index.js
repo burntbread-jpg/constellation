@@ -276,6 +276,24 @@ async function deliverHealthAlerts(env){
   return{configured:true,delivered,pending:Math.max(0,alerts.length-delivered)};
 }
 
+async function healthAlertHistory(env){
+  try{
+    const rows=await supabase(env,'health_alert_events?select=kind,status,message,delivery_attempts,delivered_at,last_delivery_error,created_at&order=created_at.desc&limit=20')||[],items=rows.map(row=>({
+      kind:row.kind,
+      status:row.status,
+      message:row.message,
+      deliveryStatus:row.delivered_at?'delivered':row.last_delivery_error?'failed':'pending',
+      attempts:Number(row.delivery_attempts||0),
+      createdAt:row.created_at,
+      deliveredAt:row.delivered_at||null
+    }));
+    return{available:true,total:items.length,pending:items.filter(item=>item.deliveryStatus==='pending').length,failed:items.filter(item=>item.deliveryStatus==='failed').length,items};
+  }catch(error){
+    console.error('Health alert history unavailable',{message:error instanceof Error?error.message:String(error)});
+    return{available:false,total:0,pending:0,failed:0,items:[]};
+  }
+}
+
 function secureTokenMatch(left,right){
   const a=String(left||''),b=String(right||'');if(!a||!b||a.length!==b.length)return false;let mismatch=0;for(let index=0;index<a.length;index++)mismatch|=a.charCodeAt(index)^b.charCodeAt(index);return mismatch===0;
 }
@@ -336,7 +354,7 @@ async function publicMetadata(response,maxAge){
   return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
 }
 
-async function operationalHealth(env,{emitAlerts=false}={}){
+async function operationalHealth(env,{emitAlerts=false,includeAlerts=false}={}){
   if(!dbReady(env))return json({ok:false,status:'unconfigured',checks:{database:false,pgvector:false}},503);
   const startedAt=performance.now(),zeroVector=`[${Array(LEXICON.length).fill('0').join(',')}]`,providerJobs={
     openLibrary:openLibrary('The Little Prince'),
@@ -364,14 +382,15 @@ async function operationalHealth(env,{emitAlerts=false}={}){
   },history=await healthHistory(env,snapshot);
   if(emitAlerts)await queueHealthAlert(env,snapshot,history);
   const notifications=emitAlerts?await deliverHealthAlerts(env):undefined;
+  const alerts=includeAlerts?await healthAlertHistory(env):undefined;
   const publicHistory={...history,items:(history.items||[]).map(({id,...item})=>item)};delete publicHistory.currentRunId;delete publicHistory.previousStatus;
-  return json({...snapshot,history:publicHistory,...(notifications?{notifications}:{})},coreReady?200:503);
+  return json({...snapshot,history:publicHistory,...(alerts?{alerts}:{}),...(notifications?{notifications}:{})},coreReady?200:503);
 }
 
 async function deepHealth(request,env){
   if(!await currentUser(request))return json({error:'로그인이 필요합니다.'},401);
   if(!metadataReviewer(request,env))return json({error:'검수 권한이 없습니다.'},403);
-  return operationalHealth(env);
+  return operationalHealth(env,{includeAlerts:true});
 }
 
 async function scheduledHealth(request,env){

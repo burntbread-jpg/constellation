@@ -145,6 +145,15 @@ test('scheduled health alerts are private, durable, and use Vault-backed cron se
   assert.match(server,/HEALTH_ALERT_WEBHOOK_URL/);
 });
 
+test('reviewer operations dashboard renders durable health alert history', async () => {
+  const core=await readFile(new URL('../src/client/01-core.js',import.meta.url),'utf8');
+  const css=await readFile(new URL('../dist/metadata.css',import.meta.url),'utf8');
+  assert.match(core,/healthAlertLabels/);
+  assert.match(core,/data\.alerts/);
+  assert.match(core,/전송 실패/);
+  assert.match(css,/\.operations-alerts/);
+});
+
 test('review dashboard presents duplicate detection as a read-only operation', async () => {
   const html=await readFile(new URL('../dist/client/index.html',import.meta.url),'utf8');
   const core=await readFile(new URL('../src/client/01-core.js',import.meta.url),'utf8');

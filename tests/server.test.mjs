@@ -77,7 +77,7 @@ function mockSupabase(url, init = {}) {
     const existing=state.healthAlerts.find(row=>row.health_check_run_id===body.health_check_run_id);if(existing)return response([]);
     const row={...body,id:state.healthAlerts.length+1,created_at:new Date().toISOString(),delivery_attempts:0,delivered_at:null,last_delivery_error:null};state.healthAlerts.push(row);return response([row]);
   }
-  if(method==='GET'&&table==='health_alert_events')return response(state.healthAlerts.filter(row=>!row.delivered_at));
+  if(method==='GET'&&table==='health_alert_events')return response(parsed.searchParams.get('delivered_at')==='is.null'?state.healthAlerts.filter(row=>!row.delivered_at):state.healthAlerts);
   if(method==='PATCH'&&table==='health_alert_events'){
     const id=Number(parsed.searchParams.get('id')?.replace(/^eq\./,'')),row=state.healthAlerts.find(item=>item.id===id);if(row)Object.assign(row,body);return response(null,204);
   }
@@ -472,6 +472,7 @@ test('deep health verifies Supabase and pgvector without exposing it publicly', 
   assert.equal(data.history.available, true);
   assert.equal(data.history.total, 1);
   assert.equal(data.history.consecutiveIssues, 0);
+  assert.deepEqual(data.alerts, {available:true,total:0,pending:0,failed:0,items:[]});
   assert.equal(data.dimensions, 25);
   assert.equal(typeof data.latencyMs, 'number');
 
@@ -483,6 +484,18 @@ test('deep health verifies Supabase and pgvector without exposing it publicly', 
   assert.equal(degradedData.status, 'degraded');
   assert.deepEqual(degradedData.checks, {database: false, pgvector: false, catalogReadable: false, vectorRpcReadable: false});
   assert.equal('error' in degradedData, false);
+});
+
+test('reviewer health dashboard exposes sanitized durable alert history', async () => {
+  const reviewerId='abababab-abab-4bab-8bab-abababababab',reviewerEnv={...env,METADATA_REVIEWER_IDS:reviewerId};
+  state.healthAlerts.push({id:17,kind:'sustained_warning',status:'warning',message:'외부 제공처 점검 필요',details:{private:'not exposed'},delivery_attempts:2,delivered_at:null,last_delivery_error:'secret webhook response',created_at:'2026-10-19T12:56:21.000Z'});
+  const result=await worker.fetch(new Request('https://site.test/api/health/deep',{headers:{'oai-authenticated-user-id':reviewerId}}),reviewerEnv),data=await result.json();
+  assert.equal(result.status,200);
+  assert.equal(data.alerts.total,1);
+  assert.equal(data.alerts.failed,1);
+  assert.deepEqual(data.alerts.items[0],{kind:'sustained_warning',status:'warning',message:'외부 제공처 점검 필요',deliveryStatus:'failed',attempts:2,createdAt:'2026-10-19T12:56:21.000Z',deliveredAt:null});
+  assert.equal(JSON.stringify(data).includes('secret webhook response'),false);
+  assert.equal(JSON.stringify(data).includes('not exposed'),false);
 });
 
 test('deep health reports provider outages as warnings while core services stay ready', async () => {
