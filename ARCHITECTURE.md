@@ -22,5 +22,7 @@ The source modules are concatenated deliberately. This preserves the existing br
 - The metadata review dialog renders those deep-check readiness flags as an operator dashboard and supports an explicit no-cache refresh. Authorization remains enforced by the server endpoint.
 - Deep health also probes configured/free metadata providers and reports a rolling five-minute API 5xx/slow-request snapshot. Provider outages are warnings while database or pgvector failures are service degradation; the reviewer dashboard refreshes automatically every 60 seconds while open.
 - Successful core health probes are retained for 30 days in a service-role-only table. The dashboard summarizes the latest 24 hours and highlights three or more consecutive warning/degraded checks without storing visitor identity or request payloads.
+- Supabase Cron calls `POST /api/health/scheduled` every five minutes with Vault-backed monitor and Sites service-access tokens, so checks continue while the dashboard is closed. The endpoint is not authorized by visitor identity.
+- Alert events are durable and service-role-only. A configured Slack/Discord-compatible webhook is notified only when the service first degrades, a warning persists for three checks, or a non-ready state recovers; failed deliveries remain queued for the next scheduled run.
 
 Do not edit generated `dist/client/app.js` or `dist/server/index.js` directly. Change the corresponding `src/` module, then rebuild.

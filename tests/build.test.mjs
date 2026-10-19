@@ -128,6 +128,23 @@ test('health check history is private, indexed, and retained by the service', as
   assert.match(migration, /health_check_runs_checked_at_idx/);
 });
 
+test('scheduled health alerts are private, durable, and use Vault-backed cron secrets', async () => {
+  const migration=await readFile(new URL('../supabase/migrations/20261019_stage59_health_alerts.sql',import.meta.url),'utf8');
+  const schedule=await readFile(new URL('../supabase/stage59_schedule_health_monitor.sql',import.meta.url),'utf8');
+  const server=await readFile(new URL('../src/server/06-router.js',import.meta.url),'utf8');
+  assert.match(migration,/create table if not exists public\.health_alert_events/);
+  assert.match(migration,/where delivered_at is null/);
+  assert.match(migration,/enable row level security/);
+  assert.match(migration,/revoke all on public\.health_alert_events from anon, authenticated/);
+  assert.match(schedule,/vault\.decrypted_secrets/);
+  assert.match(schedule,/OAI-Sites-Authorization/);
+  assert.match(schedule,/\*\/5 \* \* \* \*/);
+  assert.doesNotMatch(schedule,/Bearer [A-Za-z0-9_-]{12,}/);
+  assert.match(server,/\/api\/health\/scheduled/);
+  assert.match(server,/HEALTH_MONITOR_TOKEN/);
+  assert.match(server,/HEALTH_ALERT_WEBHOOK_URL/);
+});
+
 test('review dashboard presents duplicate detection as a read-only operation', async () => {
   const html=await readFile(new URL('../dist/client/index.html',import.meta.url),'utf8');
   const core=await readFile(new URL('../src/client/01-core.js',import.meta.url),'utf8');

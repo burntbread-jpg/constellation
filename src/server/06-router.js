@@ -22,15 +22,65 @@ function apiHealthSnapshot(){
 async function healthHistory(env,snapshot){
   try{
     const checkedAt=new Date().toISOString(),retentionCutoff=new Date(Date.now()-30*86400000).toISOString();
-    await supabase(env,'health_check_runs',{method:'POST',prefer:'return=minimal',body:{status:snapshot.status,database_ready:snapshot.checks.database,pgvector_ready:snapshot.checks.pgvector,provider_failures:Object.values(snapshot.providers).filter(value=>value==='error').length,providers:snapshot.providers,traffic:snapshot.traffic,latency_ms:snapshot.latencyMs,checked_at:checkedAt}});
+    const inserted=await supabase(env,'health_check_runs',{method:'POST',prefer:'return=representation',body:{status:snapshot.status,database_ready:snapshot.checks.database,pgvector_ready:snapshot.checks.pgvector,provider_failures:Object.values(snapshot.providers).filter(value=>value==='error').length,providers:snapshot.providers,traffic:snapshot.traffic,latency_ms:snapshot.latencyMs,checked_at:checkedAt}}),runId=inserted?.[0]?.id||null;
     await supabase(env,`health_check_runs?checked_at=lt.${encodeURIComponent(retentionCutoff)}`,{method:'DELETE',prefer:'return=minimal'});
-    const since=new Date(Date.now()-86400000).toISOString(),rows=await supabase(env,`health_check_runs?checked_at=gte.${encodeURIComponent(since)}&select=status,database_ready,pgvector_ready,provider_failures,latency_ms,checked_at&order=checked_at.desc&limit=1440`),items=(rows||[]).slice(0,12),issues=(rows||[]).filter(row=>row.status!=='ready').length;
+    const since=new Date(Date.now()-86400000).toISOString(),rows=await supabase(env,`health_check_runs?checked_at=gte.${encodeURIComponent(since)}&select=id,status,database_ready,pgvector_ready,provider_failures,latency_ms,checked_at&order=checked_at.desc&limit=1440`),items=(rows||[]).slice(0,12),issues=(rows||[]).filter(row=>row.status!=='ready').length;
     let consecutiveIssues=0;for(const row of rows||[]){if(row.status==='ready')break;consecutiveIssues++}
-    return{available:true,windowHours:24,total:(rows||[]).length,issues,consecutiveIssues,lastRecoveredAt:(rows||[]).find(row=>row.status==='ready')?.checked_at||null,items};
+    const previousStatus=(rows||[]).find(row=>String(row.id)!==String(runId))?.status||null;
+    return{available:true,windowHours:24,total:(rows||[]).length,issues,consecutiveIssues,lastRecoveredAt:(rows||[]).find(row=>row.status==='ready')?.checked_at||null,items,currentRunId:runId,previousStatus};
   }catch(error){
     console.error('Health history unavailable',{message:error instanceof Error?error.message:String(error)});
-    return{available:false,windowHours:24,total:0,issues:0,consecutiveIssues:0,lastRecoveredAt:null,items:[]};
+    return{available:false,windowHours:24,total:0,issues:0,consecutiveIssues:0,lastRecoveredAt:null,items:[],currentRunId:null,previousStatus:null};
   }
+}
+
+function healthAlert(snapshot,history){
+  if(!history.available||!history.currentRunId)return null;
+  if(snapshot.status==='degraded'&&history.previousStatus!=='degraded')return{kind:'service_degraded',message:'취향 성좌 핵심 서비스 점검에서 장애가 감지됐습니다.'};
+  if(snapshot.status==='warning'&&history.consecutiveIssues===3)return{kind:'sustained_warning',message:'취향 성좌 외부 제공처 또는 API 상태가 3회 연속 주의 단계입니다.'};
+  if(snapshot.status==='ready'&&history.previousStatus&&history.previousStatus!=='ready')return{kind:'recovered',message:'취향 성좌 서비스가 정상 상태로 복구됐습니다.'};
+  return null;
+}
+
+async function queueHealthAlert(env,snapshot,history){
+  const alert=healthAlert(snapshot,history);
+  if(!alert)return null;
+  try{
+    const rows=await supabase(env,'health_alert_events?on_conflict=health_check_run_id',{method:'POST',prefer:'resolution=ignore-duplicates,return=representation',body:{health_check_run_id:history.currentRunId,kind:alert.kind,status:snapshot.status,message:alert.message,details:{checks:snapshot.checks,providers:snapshot.providers,traffic:snapshot.traffic,latencyMs:snapshot.latencyMs}}});
+    return rows?.[0]||null;
+  }catch(error){
+    console.error('Health alert queue unavailable',{message:error instanceof Error?error.message:String(error)});
+    return null;
+  }
+}
+
+async function deliverHealthAlerts(env){
+  if(!env.HEALTH_ALERT_WEBHOOK_URL)return{configured:false,delivered:0,pending:0};
+  let alerts=[];
+  try{alerts=await supabase(env,'health_alert_events?delivered_at=is.null&select=id,kind,status,message,details,created_at,delivery_attempts&order=created_at.asc&limit=5')||[]}catch(error){console.error('Pending health alerts unavailable',{message:error instanceof Error?error.message:String(error)});return{configured:true,delivered:0,pending:0,error:true}}
+  let delivered=0;
+  for(const alert of alerts){
+    const text=`[취향 성좌] ${alert.message}`;
+    try{
+      const response=await timedFetch(env.HEALTH_ALERT_WEBHOOK_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({text,content:text,event:'taste_constellation_health',kind:alert.kind,status:alert.status,occurredAt:alert.created_at,details:alert.details})},8000);
+      if(!response.ok)throw new Error(`Webhook ${response.status}`);
+      await supabase(env,`health_alert_events?id=eq.${encodeURIComponent(alert.id)}`,{method:'PATCH',prefer:'return=minimal',body:{delivered_at:new Date().toISOString(),delivery_attempts:Number(alert.delivery_attempts||0)+1,last_delivery_error:null}});delivered++;
+    }catch(error){
+      const message=String(error instanceof Error?error.message:error).slice(0,300);
+      try{await supabase(env,`health_alert_events?id=eq.${encodeURIComponent(alert.id)}`,{method:'PATCH',prefer:'return=minimal',body:{delivery_attempts:Number(alert.delivery_attempts||0)+1,last_delivery_error:message}})}catch{}
+      console.error('Health alert delivery failed',{alertId:alert.id,message});
+    }
+  }
+  return{configured:true,delivered,pending:Math.max(0,alerts.length-delivered)};
+}
+
+function secureTokenMatch(left,right){
+  const a=String(left||''),b=String(right||'');if(!a||!b||a.length!==b.length)return false;let mismatch=0;for(let index=0;index<a.length;index++)mismatch|=a.charCodeAt(index)^b.charCodeAt(index);return mismatch===0;
+}
+
+function monitorAuthorized(request,env){
+  const header=request.headers.get('authorization')||'',bearer=header.startsWith('Bearer ')?header.slice(7):'',token=request.headers.get('x-health-monitor-token')||bearer;
+  return secureTokenMatch(token,env.HEALTH_MONITOR_TOKEN);
 }
 
 function requestId(request){
@@ -84,9 +134,7 @@ async function publicMetadata(response,maxAge){
   return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
 }
 
-async function deepHealth(request,env){
-  if(!await currentUser(request))return json({error:'로그인이 필요합니다.'},401);
-  if(!metadataReviewer(request,env))return json({error:'검수 권한이 없습니다.'},403);
+async function operationalHealth(env,{emitAlerts=false}={}){
   if(!dbReady(env))return json({ok:false,status:'unconfigured',checks:{database:false,pgvector:false}},503);
   const startedAt=performance.now(),zeroVector=`[${Array(LEXICON.length).fill('0').join(',')}]`,providerJobs={
     openLibrary:openLibrary('The Little Prince'),
@@ -111,8 +159,22 @@ async function deepHealth(request,env){
     latencyMs:Math.round(performance.now()-startedAt),
     dimensions:LEXICON.length,
     checkedAt:new Date().toISOString()
-  },history=coreReady?await healthHistory(env,snapshot):{available:false,windowHours:24,total:0,issues:0,consecutiveIssues:0,lastRecoveredAt:null,items:[]};
-  return json({...snapshot,history},coreReady?200:503);
+  },history=await healthHistory(env,snapshot);
+  if(emitAlerts)await queueHealthAlert(env,snapshot,history);
+  const notifications=emitAlerts?await deliverHealthAlerts(env):undefined;
+  const publicHistory={...history,items:(history.items||[]).map(({id,...item})=>item)};delete publicHistory.currentRunId;delete publicHistory.previousStatus;
+  return json({...snapshot,history:publicHistory,...(notifications?{notifications}:{})},coreReady?200:503);
+}
+
+async function deepHealth(request,env){
+  if(!await currentUser(request))return json({error:'로그인이 필요합니다.'},401);
+  if(!metadataReviewer(request,env))return json({error:'검수 권한이 없습니다.'},403);
+  return operationalHealth(env);
+}
+
+async function scheduledHealth(request,env){
+  if(!monitorAuthorized(request,env))return json({error:'모니터 인증에 실패했습니다.'},401);
+  return operationalHealth(env,{emitAlerts:true});
 }
 
 async function routeApi(request,env,url){
@@ -152,6 +214,7 @@ async function routeApi(request,env,url){
     return methodNotAllowed(['PATCH','DELETE']);
   }
   if(pathname==='/api/health/deep')return request.method==='GET'?deepHealth(request,env):methodNotAllowed(['GET']);
+  if(pathname==='/api/health/scheduled')return request.method==='POST'?scheduledHealth(request,env):methodNotAllowed(['POST']);
   if(pathname==='/api/health'){
     if(request.method!=='GET')return methodNotAllowed(['GET']);
     return json({

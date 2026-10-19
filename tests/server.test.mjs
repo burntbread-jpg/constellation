@@ -27,6 +27,8 @@ const state = {
   duplicateMerges: [],
   identityExceptions: [],
   healthChecks: [],
+  healthAlerts: [],
+  webhookCalls: [],
   catalogQueries: [],
   profileWrites: 0,
   backfillCalls: 0,
@@ -67,10 +69,18 @@ function mockSupabase(url, init = {}) {
   if (state.failHealth) return response({message: 'database unavailable'}, 500);
 
   if(method==='POST'&&table==='health_check_runs'){
-    const row={...body,id:state.healthChecks.length+1};state.healthChecks.unshift(row);return response(null,204);
+    const row={...body,id:state.healthChecks.length+1};state.healthChecks.unshift(row);return response([row]);
   }
   if(method==='GET'&&table==='health_check_runs')return response(state.healthChecks);
   if(method==='DELETE'&&table==='health_check_runs')return response(null,204);
+  if(method==='POST'&&table==='health_alert_events'){
+    const existing=state.healthAlerts.find(row=>row.health_check_run_id===body.health_check_run_id);if(existing)return response([]);
+    const row={...body,id:state.healthAlerts.length+1,created_at:new Date().toISOString(),delivery_attempts:0,delivered_at:null,last_delivery_error:null};state.healthAlerts.push(row);return response([row]);
+  }
+  if(method==='GET'&&table==='health_alert_events')return response(state.healthAlerts.filter(row=>!row.delivered_at));
+  if(method==='PATCH'&&table==='health_alert_events'){
+    const id=Number(parsed.searchParams.get('id')?.replace(/^eq\./,'')),row=state.healthAlerts.find(item=>item.id===id);if(row)Object.assign(row,body);return response(null,204);
+  }
 
   if (method === 'POST' && table === 'profiles') {
     if (state.failProfiles) return response({message: 'profile storage unavailable'}, 500);
@@ -304,6 +314,7 @@ test.before(() => {
   globalThis.fetch = async (input, init) => {
     const url = String(input);
     if (url.startsWith(env.SUPABASE_URL)) return mockSupabase(url, init);
+    if (url === 'https://alerts.test/health') {state.webhookCalls.push(JSON.parse(init.body));return response({ok:true});}
     if (state.failProviders) throw new Error(`Provider unavailable: ${url}`);
     if (url.startsWith('https://api.themoviedb.org/3/search/movie')) {
       const query = new URL(url).searchParams.get('query');
@@ -402,6 +413,8 @@ test.beforeEach(() => {
   state.metadataReports = [];
   state.metadataChanges = [];
   state.healthChecks = [];
+  state.healthAlerts = [];
+  state.webhookCalls = [];
   state.profileWrites = 0;
   state.backfillCalls = 0;
   state.failProfiles = false;
@@ -487,6 +500,23 @@ test('deep health reports provider outages as warnings while core services stay 
   assert.equal(data.history.available, true);
   assert.equal(data.history.consecutiveIssues, 1);
   assert.equal('error' in data, false);
+});
+
+test('scheduled health requires a secret and alerts only after three consecutive warnings', async () => {
+  const monitorEnv={...env,HEALTH_MONITOR_TOKEN:'monitor-secret',HEALTH_ALERT_WEBHOOK_URL:'https://alerts.test/health'};
+  const denied=await worker.fetch(new Request('https://site.test/api/health/scheduled',{method:'POST'}),monitorEnv);
+  assert.equal(denied.status,401);
+  state.failProviders=true;
+  for(let index=0;index<3;index++){
+    const result=await worker.fetch(new Request('https://site.test/api/health/scheduled',{method:'POST',headers:{authorization:'Bearer monitor-secret'}}),monitorEnv);
+    assert.equal(result.status,200);
+  }
+  assert.equal(state.healthChecks.length,3);
+  assert.equal(state.healthAlerts.length,1);
+  assert.equal(state.healthAlerts[0].kind,'sustained_warning');
+  assert.ok(state.healthAlerts[0].delivered_at);
+  assert.equal(state.webhookCalls.length,1);
+  assert.match(state.webhookCalls[0].text,/3회 연속/);
 });
 
 test('API routing distinguishes missing paths and unsupported methods', async () => {
