@@ -28,3 +28,8 @@ The source modules are concatenated deliberately. This preserves the existing br
 - Reviewers can acknowledge, resolve, and reopen operational incidents with required notes. A PostgreSQL function locks each alert and atomically updates its lifecycle snapshot plus an append-only action history; the dashboard exposes notes and timestamps but never reviewer identifiers.
 
 Do not edit generated `dist/client/app.js` or `dist/server/index.js` directly. Change the corresponding `src/` module, then rebuild.
+
+## Shared Supabase security
+
+- The public game leaderboard remains a stable read-only API, but no longer relies on a view owner's privileges to bypass RLS. A trigger-maintained projection stores only leaderboard-safe fields in the unexposed `private` schema, and `public.leaderboard` reads it with `security_invoker`.
+- Anonymous and authenticated roles receive only `SELECT` on the sanitized view and its private backing projection. They do not receive public access to `game_scores`, user IDs are omitted from the view, and the private trigger functions have no client execution grants.

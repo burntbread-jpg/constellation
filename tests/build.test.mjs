@@ -179,6 +179,17 @@ test('operational incidents have atomic resolve and reopen lifecycle history',as
   assert.match(migration,/create table if not exists public\.health_alert_actions/);assert.match(migration,/for update/);assert.match(migration,/security invoker/);assert.match(migration,/revoke all on function public\.record_health_alert_action/);
 });
 
+test('public leaderboard uses an invoker view over a private sanitized projection',async()=>{
+  const migration=await readFile(new URL('../supabase/migrations/20261022150541_stage63_secure_leaderboard.sql',import.meta.url),'utf8');
+  assert.match(migration,/create table if not exists private\.leaderboard_entries/);
+  assert.match(migration,/security_invoker = true/);
+  assert.match(migration,/revoke all on public\.leaderboard from public, anon, authenticated/);
+  assert.match(migration,/grant select on public\.leaderboard to anon, authenticated, service_role/);
+  assert.doesNotMatch(migration,/grant select on public\.game_scores to anon/);
+  assert.match(migration,/security definer\s+set search_path = ''/);
+  assert.match(migration,/revoke all on function private\.sync_leaderboard_score\(\)/);
+});
+
 test('review dashboard presents duplicate detection as a read-only operation', async () => {
   const html=await readFile(new URL('../dist/client/index.html',import.meta.url),'utf8');
   const core=await readFile(new URL('../src/client/01-core.js',import.meta.url),'utf8');
