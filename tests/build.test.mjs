@@ -160,14 +160,23 @@ test('operational alerts support private reviewer acknowledgement and resolution
   const events=await readFile(new URL('../src/client/04-events.js',import.meta.url),'utf8');
   const css=await readFile(new URL('../dist/client/metadata.css',import.meta.url),'utf8');
   const migration=await readFile(new URL('../supabase/migrations/20261019_stage61_alert_acknowledgement.sql',import.meta.url),'utf8');
-  assert.match(server,/acknowledgeHealthAlert/);
+  assert.match(server,/updateHealthAlertLifecycle/);
   assert.match(server,/ACKNOWLEDGE_ALERT/);
-  assert.match(server,/acknowledged_by:user\.id/);
-  assert.match(core,/data-health-alert-ack/);
-  assert.match(events,/acknowledgeHealthAlert/);
+  assert.match(server,/record_health_alert_action/);
+  assert.match(core,/data-health-alert-action/);
+  assert.match(events,/updateHealthAlertLifecycle/);
   assert.match(css,/article\.acknowledged/);
   assert.match(migration,/health_alert_events_unacknowledged_idx/);
   assert.match(migration,/revoke all on public\.health_alert_events from anon, authenticated/);
+});
+
+test('operational incidents have atomic resolve and reopen lifecycle history',async()=>{
+  const server=await readFile(new URL('../src/server/06-router.js',import.meta.url),'utf8');
+  const core=await readFile(new URL('../src/client/01-core.js',import.meta.url),'utf8');
+  const migration=await readFile(new URL('../supabase/migrations/20261022022950_stage62_incident_lifecycle.sql',import.meta.url),'utf8');
+  assert.match(server,/RESOLVE_ALERT/);assert.match(server,/REOPEN_ALERT/);assert.match(server,/health_alert_actions/);
+  assert.match(core,/해결 처리/);assert.match(core,/재개방/);assert.match(core,/alert-action-history/);
+  assert.match(migration,/create table if not exists public\.health_alert_actions/);assert.match(migration,/for update/);assert.match(migration,/security invoker/);assert.match(migration,/revoke all on function public\.record_health_alert_action/);
 });
 
 test('review dashboard presents duplicate detection as a read-only operation', async () => {

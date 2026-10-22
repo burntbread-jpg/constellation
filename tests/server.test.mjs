@@ -28,6 +28,7 @@ const state = {
   identityExceptions: [],
   healthChecks: [],
   healthAlerts: [],
+  healthAlertActions: [],
   webhookCalls: [],
   catalogQueries: [],
   profileWrites: 0,
@@ -73,11 +74,27 @@ function mockSupabase(url, init = {}) {
   }
   if(method==='GET'&&table==='health_check_runs')return response(state.healthChecks);
   if(method==='DELETE'&&table==='health_check_runs')return response(null,204);
+  if(method==='POST'&&table==='record_health_alert_action'){
+    const row=state.healthAlerts.find(item=>item.id===body.p_alert_id);if(!row)return response({message:'alert not found'},400);
+    const now=new Date().toISOString(),action=body.p_action;
+    if(action==='acknowledge'){
+      if(row.acknowledged_at||row.resolved_at)return response({message:'invalid alert transition'},400);
+      Object.assign(row,{acknowledged_at:now,acknowledged_by:body.p_actor_id,resolution_note:body.p_note});
+    }else if(action==='resolve'){
+      if(!row.acknowledged_at||row.resolved_at)return response({message:'invalid alert transition'},400);
+      Object.assign(row,{resolved_at:now,resolved_by:body.p_actor_id,resolution_summary:body.p_note});
+    }else if(action==='reopen'){
+      if(!row.resolved_at)return response({message:'invalid alert transition'},400);
+      Object.assign(row,{acknowledged_at:null,acknowledged_by:null,resolution_note:null,resolved_at:null,resolved_by:null,resolution_summary:null});
+    }else return response({message:'invalid alert action'},400);
+    const recorded=action==='acknowledge'?'acknowledged':action==='resolve'?'resolved':'reopened';state.healthAlertActions.unshift({health_alert_event_id:row.id,action:recorded,actor_id:body.p_actor_id,note:body.p_note,created_at:now});return response({id:row.id,action:recorded,actedAt:now,acknowledged:action!=='reopen',resolved:action==='resolve'});
+  }
   if(method==='POST'&&table==='health_alert_events'){
     const existing=state.healthAlerts.find(row=>row.health_check_run_id===body.health_check_run_id);if(existing)return response([]);
-    const row={...body,id:state.healthAlerts.length+1,created_at:new Date().toISOString(),delivery_attempts:0,delivered_at:null,last_delivery_error:null,acknowledged_at:null,acknowledged_by:null,resolution_note:null};state.healthAlerts.push(row);return response([row]);
+    const row={...body,id:state.healthAlerts.length+1,created_at:new Date().toISOString(),delivery_attempts:0,delivered_at:null,last_delivery_error:null,acknowledged_at:null,acknowledged_by:null,resolution_note:null,resolved_at:null,resolved_by:null,resolution_summary:null};state.healthAlerts.push(row);return response([row]);
   }
   if(method==='GET'&&table==='health_alert_events')return response(parsed.searchParams.get('delivered_at')==='is.null'?state.healthAlerts.filter(row=>!row.delivered_at):state.healthAlerts);
+  if(method==='GET'&&table==='health_alert_actions')return response(state.healthAlertActions);
   if(method==='PATCH'&&table==='health_alert_events'){
     const id=Number(parsed.searchParams.get('id')?.replace(/^eq\./,'')),needsUnacknowledged=parsed.searchParams.get('acknowledged_at')==='is.null',row=state.healthAlerts.find(item=>item.id===id&&(!needsUnacknowledged||!item.acknowledged_at));if(row)Object.assign(row,body);return new Headers(init.headers).get('prefer')?.includes('return=representation')?response(row?[row]:[]):response(null,204);
   }
@@ -472,7 +489,7 @@ test('deep health verifies Supabase and pgvector without exposing it publicly', 
   assert.equal(data.history.available, true);
   assert.equal(data.history.total, 1);
   assert.equal(data.history.consecutiveIssues, 0);
-  assert.deepEqual(data.alerts, {available:true,total:0,pending:0,failed:0,unacknowledged:0,items:[]});
+  assert.deepEqual(data.alerts, {available:true,total:0,pending:0,failed:0,open:0,resolved:0,unacknowledged:0,items:[]});
   assert.equal(data.dimensions, 25);
   assert.equal(typeof data.latencyMs, 'number');
 
@@ -493,7 +510,7 @@ test('reviewer health dashboard exposes sanitized durable alert history', async 
   assert.equal(result.status,200);
   assert.equal(data.alerts.total,1);
   assert.equal(data.alerts.failed,1);
-  assert.deepEqual(data.alerts.items[0],{id:17,kind:'sustained_warning',status:'warning',message:'외부 제공처 점검 필요',deliveryStatus:'failed',attempts:2,createdAt:'2026-10-19T12:56:21.000Z',deliveredAt:null,acknowledged:false,acknowledgedAt:null,resolutionNote:null});
+  assert.deepEqual(data.alerts.items[0],{id:17,kind:'sustained_warning',status:'warning',message:'외부 제공처 점검 필요',deliveryStatus:'failed',attempts:2,createdAt:'2026-10-19T12:56:21.000Z',deliveredAt:null,acknowledged:false,acknowledgedAt:null,acknowledgementNote:null,resolved:false,resolvedAt:null,resolutionSummary:null,actions:[]});
   assert.equal(JSON.stringify(data).includes('secret webhook response'),false);
   assert.equal(JSON.stringify(data).includes('not exposed'),false);
 });
@@ -509,10 +526,23 @@ test('only reviewers can acknowledge an operational alert with an audited resolu
   const invalid=await worker.fetch(new Request('https://site.test/api/health/alerts/23',{method:'PATCH',headers:reviewerHeaders,body:JSON.stringify({confirmation:'ACKNOWLEDGE_ALERT',note:'짧음'})}),reviewerEnv);
   assert.equal(invalid.status,400);
   const result=await worker.fetch(new Request('https://site.test/api/health/alerts/23',{method:'PATCH',headers:reviewerHeaders,body}),reviewerEnv),data=await result.json();
-  assert.equal(result.status,200);assert.equal(data.acknowledged,true);assert.equal(state.healthAlerts.find(item=>item.id===23).acknowledged_by,reviewerId);
+  assert.equal(result.status,200);assert.equal(data.action,'acknowledged');assert.equal(state.healthAlerts.find(item=>item.id===23).acknowledged_by,reviewerId);
   const duplicate=await worker.fetch(new Request('https://site.test/api/health/alerts/23',{method:'PATCH',headers:reviewerHeaders,body}),reviewerEnv);
-  assert.equal(duplicate.status,404);
+  assert.equal(duplicate.status,409);
   state.healthAlerts=state.healthAlerts.filter(item=>item.id!==23);
+  state.healthAlertActions=state.healthAlertActions.filter(item=>item.health_alert_event_id!==23);
+});
+
+test('reviewers can resolve and reopen acknowledged incidents while preserving action history',async()=>{
+  const reviewerId='aeaeaeae-aeae-4eae-8eae-aeaeaeaeaeae',reviewerEnv={...env,METADATA_REVIEWER_IDS:reviewerId},reviewerHeaders={'oai-authenticated-user-id':reviewerId,'content-type':'application/json'};
+  state.healthAlerts.push({id:24,kind:'service_degraded',status:'degraded',message:'외부 제공처 장애',delivery_attempts:1,delivered_at:null,last_delivery_error:null,created_at:'2026-10-19T14:00:00.000Z',acknowledged_at:'2026-10-19T14:05:00.000Z',acknowledged_by:reviewerId,resolution_note:'장애 범위와 원인을 확인함',resolved_at:null,resolved_by:null,resolution_summary:null});
+  let result=await worker.fetch(new Request('https://site.test/api/health/alerts/24',{method:'PATCH',headers:reviewerHeaders,body:JSON.stringify({action:'resolve',confirmation:'RESOLVE_ALERT',note:'외부 제공처 복구와 정상 응답을 확인함'})}),reviewerEnv),data=await result.json();
+  assert.equal(result.status,200);assert.equal(data.action,'resolved');assert.ok(state.healthAlerts.find(item=>item.id===24).resolved_at);
+  result=await worker.fetch(new Request('https://site.test/api/health/deep',{headers:{'oai-authenticated-user-id':reviewerId}}),reviewerEnv);data=await result.json();
+  const resolved=data.alerts.items.find(item=>item.id===24);assert.equal(resolved.resolved,true);assert.equal(resolved.resolutionSummary,'외부 제공처 복구와 정상 응답을 확인함');assert.equal(resolved.actions[0].action,'resolved');assert.equal(JSON.stringify(resolved).includes(reviewerId),false);
+  result=await worker.fetch(new Request('https://site.test/api/health/alerts/24',{method:'PATCH',headers:reviewerHeaders,body:JSON.stringify({action:'reopen',confirmation:'REOPEN_ALERT',note:'동일 장애가 재발해 추가 대응이 필요함'})}),reviewerEnv);data=await result.json();
+  assert.equal(result.status,200);assert.equal(data.action,'reopened');const reopened=state.healthAlerts.find(item=>item.id===24);assert.equal(reopened.resolved_at,null);assert.equal(reopened.acknowledged_at,null);
+  state.healthAlerts=state.healthAlerts.filter(item=>item.id!==24);state.healthAlertActions=state.healthAlertActions.filter(item=>item.health_alert_event_id!==24);
 });
 
 test('deep health reports provider outages as warnings while core services stay ready', async () => {
