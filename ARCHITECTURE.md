@@ -15,6 +15,12 @@ The source modules are concatenated deliberately. This preserves the existing br
 - `npm test` — run API, recommendation, data-integrity, and build-drift tests.
 - `npm run check` — rebuild and run the complete suite before deployment.
 
+## Continuous integration
+
+- `.github/workflows/quality.yml` runs on every pull request and every push to `master`, with a manual dispatch option for release checks.
+- The quality gate rebuilds the deployable artifacts, runs the complete Node test suite, evaluates the deterministic 30-work recommendation benchmark, and fails if generated deployment or quality-report files differ from the committed source state.
+- The workflow has read-only repository permissions, cancels superseded runs on the same ref, and is capped at ten minutes.
+
 ## Operational health
 
 - `GET /api/health` reports public configuration availability without making external calls.

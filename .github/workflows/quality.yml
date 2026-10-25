@@ -1,0 +1,41 @@
+name: Quality Gate
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Build, test, and recommendation quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build and run the complete test suite
+        run: npm run check
+
+      - name: Evaluate recommendation quality
+        run: npm run eval:recommendations
+
+      - name: Verify generated artifacts are committed
+        run: git diff --exit-code -- dist quality/reports

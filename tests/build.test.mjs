@@ -190,6 +190,17 @@ test('public leaderboard uses an invoker view over a private sanitized projectio
   assert.match(migration,/revoke all on function private\.sync_leaderboard_score\(\)/);
 });
 
+test('GitHub Actions blocks changes that fail build, tests, or recommendation quality',async()=>{
+  const workflow=await readFile(new URL('../.github/workflows/quality.yml',import.meta.url),'utf8');
+  assert.match(workflow,/pull_request:/);
+  assert.match(workflow,/push:\s*\n\s*branches:\s*\n\s*- master/);
+  assert.match(workflow,/permissions:\s*\n\s*contents: read/);
+  assert.match(workflow,/timeout-minutes: 10/);
+  assert.match(workflow,/run: npm run check/);
+  assert.match(workflow,/run: npm run eval:recommendations/);
+  assert.match(workflow,/git diff --exit-code -- dist quality\/reports/);
+});
+
 test('review dashboard presents duplicate detection as a read-only operation', async () => {
   const html=await readFile(new URL('../dist/client/index.html',import.meta.url),'utf8');
   const core=await readFile(new URL('../src/client/01-core.js',import.meta.url),'utf8');
