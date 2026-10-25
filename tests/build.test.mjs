@@ -205,7 +205,11 @@ test('GitHub Actions blocks build, recommendation, security, accessibility, and 
   assert.match(workflow,/run: pnpm run test:e2e/);
   assert.match(workflow,/Build, test, security, accessibility, and performance/);
   assert.match(workflow,/git diff --exit-code -- dist quality\/reports/);
+  const actionReferences=[...workflow.matchAll(/^\s*uses:\s*([^\s#]+)/gm)].map(match=>match[1]);
+  assert.ok(actionReferences.length>=3,'expected all workflow actions to be enumerated');
+  for(const reference of actionReferences)assert.match(reference,/@[0-9a-f]{40}$/i,`GitHub Action must be pinned to a commit SHA: ${reference}`);
   assert.match(dependabot,/package-ecosystem: "npm"/);
+  assert.match(dependabot,/package-ecosystem: "github-actions"/);
   assert.match(dependabot,/interval: "weekly"/);
   assert.match(dependabot,/open-pull-requests-limit: 5/);
 });

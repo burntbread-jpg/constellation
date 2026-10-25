@@ -23,6 +23,7 @@ The source modules are concatenated deliberately. This preserves the existing br
 - Playwright runs the primary signed-in journey against the built `dist/` application in desktop and mobile Chromium. API responses are isolated fixtures, so search, Connection Mode navigation, archive save, delete, and undo remain reproducible without production credentials or user data.
 - The same desktop and mobile runs audit the discover view, save dialog, and constellation archive against WCAG A/AA rules. Node tests also enforce 30 KB HTML, 60 KB CSS, 125 KB JavaScript, and 215 KB total initial-shell budgets.
 - The locked dependency graph is audited on every push and pull request; high or critical advisories fail the quality gate. Dependabot checks the pnpm/npm ecosystem weekly and keeps its pull-request volume bounded.
+- Every third-party GitHub Action is pinned to an immutable 40-character commit SHA. Dependabot separately tracks the GitHub Actions ecosystem so those pins receive reviewed updates without restoring mutable tags.
 
 ## Operational health
 
