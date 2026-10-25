@@ -23,6 +23,12 @@
   transform: translateY(-3px);
 }
 
+/* WCAG AA contrast for secondary text on the dark application surfaces. */
+.search-wrap kbd { color:#92969f; }
+.rec-card .creator { color:#8d929b; }
+.metadata-verification.empty small { color:#8e939c; }
+.metadata-report-btn { color:#858a94; }
+
 .archive-retry {
   margin-top: 1rem;
   min-height: 2.75rem;

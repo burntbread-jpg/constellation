@@ -190,7 +190,7 @@ test('public leaderboard uses an invoker view over a private sanitized projectio
   assert.match(migration,/revoke all on function private\.sync_leaderboard_score\(\)/);
 });
 
-test('GitHub Actions blocks changes that fail build, tests, or recommendation quality',async()=>{
+test('GitHub Actions blocks build, recommendation, accessibility, and performance regressions',async()=>{
   const workflow=await readFile(new URL('../.github/workflows/quality.yml',import.meta.url),'utf8');
   assert.match(workflow,/pull_request:/);
   assert.match(workflow,/push:\s*\n\s*branches:\s*\n\s*- master/);
@@ -201,6 +201,7 @@ test('GitHub Actions blocks changes that fail build, tests, or recommendation qu
   assert.match(workflow,/pnpm install --frozen-lockfile/);
   assert.match(workflow,/playwright install --with-deps chromium/);
   assert.match(workflow,/run: pnpm run test:e2e/);
+  assert.match(workflow,/Build, test, accessibility, and performance/);
   assert.match(workflow,/git diff --exit-code -- dist quality\/reports/);
 });
 

@@ -1,4 +1,5 @@
 import {expect, test} from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 const persona = {
   id: 'tmdb:movie:10404',
@@ -92,6 +93,14 @@ async function installApiMocks(page) {
   return state;
 }
 
+async function expectNoSeriousAccessibilityViolations(page, label) {
+  const results = await new AxeBuilder({page})
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze();
+  const violations = results.violations.filter(item => ['serious', 'critical'].includes(item.impact));
+  expect(violations, `${label}: ${violations.map(item => `${item.id} (${item.nodes.length})`).join(', ')}`).toEqual([]);
+}
+
 test.beforeEach(async ({page}) => {
   await installApiMocks(page);
   await page.goto('/');
@@ -104,7 +113,7 @@ test('search opens a work and Connection Mode navigates to a recommendation', as
   await expect(page.locator('#workTitle')).toHaveText('퍼소나');
   await expect(page.locator('#workYear')).toHaveText('1966');
 
-  await page.getByRole('button', {name: 'STORY'}).click();
+  await page.getByRole('tab', {name: 'STORY'}).click();
   await expect(page.locator('.rec-card')).toHaveCount(3);
   await expect(page.locator('#recommendations')).toContainText('컨택트');
   await page.locator('[data-recommendation="tmdb:movie:329865"]').click();
@@ -145,4 +154,17 @@ test('keyboard search and responsive layout remain usable', async ({page, isMobi
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow, `${isMobile ? 'mobile' : 'desktop'} viewport has horizontal overflow`).toBeLessThanOrEqual(1);
+});
+
+test('primary screens meet WCAG A and AA without serious violations', async ({page}) => {
+  await expectNoSeriousAccessibilityViolations(page, '탐색 화면');
+
+  await page.locator('#saveBtn').click();
+  await expect(page.locator('#saveDialog')).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page, '저장 대화상자');
+  await page.locator('#saveDialog .dialog-close').click();
+
+  await page.locator('[data-view="archive"]').click();
+  await expect(page.locator('#archiveView')).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page, '내 성좌 화면');
 });
