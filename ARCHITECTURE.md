@@ -22,6 +22,7 @@ The source modules are concatenated deliberately. This preserves the existing br
 - The workflow has read-only repository permissions, cancels superseded runs on the same ref, and is capped at fifteen minutes.
 - Playwright runs the primary signed-in journey against the built `dist/` application in desktop and mobile Chromium. API responses are isolated fixtures, so search, Connection Mode navigation, archive save, delete, and undo remain reproducible without production credentials or user data.
 - The same desktop and mobile runs audit the discover view, save dialog, and constellation archive against WCAG A/AA rules. Node tests also enforce 30 KB HTML, 60 KB CSS, 125 KB JavaScript, and 215 KB total initial-shell budgets.
+- The locked dependency graph is audited on every push and pull request; high or critical advisories fail the quality gate. Dependabot checks the pnpm/npm ecosystem weekly and keeps its pull-request volume bounded.
 
 ## Operational health
 

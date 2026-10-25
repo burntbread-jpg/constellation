@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   quality:
-    name: Build, test, accessibility, and performance
+    name: Build, test, security, accessibility, and performance
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -39,6 +39,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Audit dependency vulnerabilities
+        run: pnpm run audit:dependencies
 
       - name: Build and run the complete test suite
         run: npm run check

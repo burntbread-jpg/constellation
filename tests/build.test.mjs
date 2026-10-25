@@ -190,8 +190,9 @@ test('public leaderboard uses an invoker view over a private sanitized projectio
   assert.match(migration,/revoke all on function private\.sync_leaderboard_score\(\)/);
 });
 
-test('GitHub Actions blocks build, recommendation, accessibility, and performance regressions',async()=>{
+test('GitHub Actions blocks build, recommendation, security, accessibility, and performance regressions',async()=>{
   const workflow=await readFile(new URL('../.github/workflows/quality.yml',import.meta.url),'utf8');
+  const dependabot=await readFile(new URL('../.github/dependabot.yml',import.meta.url),'utf8');
   assert.match(workflow,/pull_request:/);
   assert.match(workflow,/push:\s*\n\s*branches:\s*\n\s*- master/);
   assert.match(workflow,/permissions:\s*\n\s*contents: read/);
@@ -199,10 +200,14 @@ test('GitHub Actions blocks build, recommendation, accessibility, and performanc
   assert.match(workflow,/run: npm run check/);
   assert.match(workflow,/run: npm run eval:recommendations/);
   assert.match(workflow,/pnpm install --frozen-lockfile/);
+  assert.match(workflow,/pnpm run audit:dependencies/);
   assert.match(workflow,/playwright install --with-deps chromium/);
   assert.match(workflow,/run: pnpm run test:e2e/);
-  assert.match(workflow,/Build, test, accessibility, and performance/);
+  assert.match(workflow,/Build, test, security, accessibility, and performance/);
   assert.match(workflow,/git diff --exit-code -- dist quality\/reports/);
+  assert.match(dependabot,/package-ecosystem: "npm"/);
+  assert.match(dependabot,/interval: "weekly"/);
+  assert.match(dependabot,/open-pull-requests-limit: 5/);
 });
 
 test('review dashboard presents duplicate detection as a read-only operation', async () => {
