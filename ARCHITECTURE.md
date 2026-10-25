@@ -20,6 +20,7 @@ The source modules are concatenated deliberately. This preserves the existing br
 - `.github/workflows/quality.yml` runs on every pull request and every push to `master`, with a manual dispatch option for release checks.
 - The quality gate rebuilds the deployable artifacts, runs the complete Node test suite, evaluates the deterministic 30-work recommendation benchmark, and fails if generated deployment or quality-report files differ from the committed source state.
 - The workflow has read-only repository permissions, cancels superseded runs on the same ref, and is capped at ten minutes.
+- Playwright runs the primary signed-in journey against the built `dist/` application in desktop and mobile Chromium. API responses are isolated fixtures, so search, Connection Mode navigation, archive save, delete, and undo remain reproducible without production credentials or user data.
 
 ## Operational health
 

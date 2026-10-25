@@ -20,22 +20,37 @@ jobs:
   quality:
     name: Build, test, and recommendation quality
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Build and run the complete test suite
         run: npm run check
 
       - name: Evaluate recommendation quality
         run: npm run eval:recommendations
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run browser journeys
+        run: pnpm run test:e2e
 
       - name: Verify generated artifacts are committed
         run: git diff --exit-code -- dist quality/reports

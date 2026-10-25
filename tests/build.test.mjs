@@ -195,9 +195,12 @@ test('GitHub Actions blocks changes that fail build, tests, or recommendation qu
   assert.match(workflow,/pull_request:/);
   assert.match(workflow,/push:\s*\n\s*branches:\s*\n\s*- master/);
   assert.match(workflow,/permissions:\s*\n\s*contents: read/);
-  assert.match(workflow,/timeout-minutes: 10/);
+  assert.match(workflow,/timeout-minutes: 15/);
   assert.match(workflow,/run: npm run check/);
   assert.match(workflow,/run: npm run eval:recommendations/);
+  assert.match(workflow,/pnpm install --frozen-lockfile/);
+  assert.match(workflow,/playwright install --with-deps chromium/);
+  assert.match(workflow,/run: pnpm run test:e2e/);
   assert.match(workflow,/git diff --exit-code -- dist quality\/reports/);
 });
 
