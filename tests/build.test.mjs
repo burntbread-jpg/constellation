@@ -195,6 +195,7 @@ test('GitHub Actions blocks build, recommendation, security, accessibility, and 
   const codeql=await readFile(new URL('../.github/workflows/codeql.yml',import.meta.url),'utf8');
   const secretScan=await readFile(new URL('../.github/workflows/secret-scan.yml',import.meta.url),'utf8');
   const sbom=await readFile(new URL('../.github/workflows/sbom.yml',import.meta.url),'utf8');
+  const provenance=await readFile(new URL('../.github/workflows/provenance.yml',import.meta.url),'utf8');
   const dependabot=await readFile(new URL('../.github/dependabot.yml',import.meta.url),'utf8');
   assert.match(workflow,/pull_request:/);
   assert.match(workflow,/push:\s*\n\s*branches:\s*\n\s*- master/);
@@ -235,8 +236,18 @@ test('GitHub Actions blocks build, recommendation, security, accessibility, and 
   assert.match(sbom,/if-no-files-found: error/);
   assert.match(sbom,/anchore\/sbom-action@[0-9a-f]{40}/i);
   assert.match(sbom,/actions\/upload-artifact@[0-9a-f]{40}/i);
-  const actionReferences=[...`${workflow}\n${codeql}\n${secretScan}\n${sbom}`.matchAll(/^\s*uses:\s*([^\s#]+)/gm)].map(match=>match[1]);
-  assert.ok(actionReferences.length>=11,'expected all workflow actions to be enumerated');
+  assert.match(provenance,/name: Build Provenance/);
+  assert.match(provenance,/permissions:\s*\n\s*contents: read\s*\n\s*id-token: write\s*\n\s*attestations: write/);
+  assert.doesNotMatch(provenance,/pull_request:/);
+  assert.match(provenance,/git diff --exit-code -- dist/);
+  assert.match(provenance,/--sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner/);
+  assert.match(provenance,/sha256sum site-dist\.tar\.gz/);
+  assert.match(provenance,/actions\/attest-build-provenance@[0-9a-f]{40}/i);
+  assert.match(provenance,/subject-path: site-dist\.tar\.gz/);
+  assert.match(provenance,/retention-days: 30/);
+  assert.match(provenance,/compression-level: 0/);
+  const actionReferences=[...`${workflow}\n${codeql}\n${secretScan}\n${sbom}\n${provenance}`.matchAll(/^\s*uses:\s*([^\s#]+)/gm)].map(match=>match[1]);
+  assert.ok(actionReferences.length>=15,'expected all workflow actions to be enumerated');
   for(const reference of actionReferences)assert.match(reference,/@[0-9a-f]{40}$/i,`GitHub Action must be pinned to a commit SHA: ${reference}`);
   assert.match(dependabot,/package-ecosystem: "npm"/);
   assert.match(dependabot,/package-ecosystem: "github-actions"/);
