@@ -194,6 +194,7 @@ test('GitHub Actions blocks build, recommendation, security, accessibility, and 
   const workflow=await readFile(new URL('../.github/workflows/quality.yml',import.meta.url),'utf8');
   const codeql=await readFile(new URL('../.github/workflows/codeql.yml',import.meta.url),'utf8');
   const secretScan=await readFile(new URL('../.github/workflows/secret-scan.yml',import.meta.url),'utf8');
+  const sbom=await readFile(new URL('../.github/workflows/sbom.yml',import.meta.url),'utf8');
   const dependabot=await readFile(new URL('../.github/dependabot.yml',import.meta.url),'utf8');
   assert.match(workflow,/pull_request:/);
   assert.match(workflow,/push:\s*\n\s*branches:\s*\n\s*- master/);
@@ -224,8 +225,18 @@ test('GitHub Actions blocks build, recommendation, security, accessibility, and 
   assert.match(secretScan,/gitleaks\/gitleaks-action@[0-9a-f]{40}/i);
   assert.match(secretScan,/GITLEAKS_ENABLE_COMMENTS: "false"/);
   assert.match(secretScan,/GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"/);
-  const actionReferences=[...`${workflow}\n${codeql}\n${secretScan}`.matchAll(/^\s*uses:\s*([^\s#]+)/gm)].map(match=>match[1]);
-  assert.ok(actionReferences.length>=8,'expected all workflow actions to be enumerated');
+  assert.match(sbom,/name: Software Bill of Materials/);
+  assert.match(sbom,/format: cyclonedx-json/);
+  assert.match(sbom,/output-file: sbom\.cdx\.json/);
+  assert.match(sbom,/syft-version: v1\.55\.0/);
+  assert.match(sbom,/dependency-snapshot: "false"/);
+  assert.match(sbom,/upload-release-assets: "false"/);
+  assert.match(sbom,/retention-days: 30/);
+  assert.match(sbom,/if-no-files-found: error/);
+  assert.match(sbom,/anchore\/sbom-action@[0-9a-f]{40}/i);
+  assert.match(sbom,/actions\/upload-artifact@[0-9a-f]{40}/i);
+  const actionReferences=[...`${workflow}\n${codeql}\n${secretScan}\n${sbom}`.matchAll(/^\s*uses:\s*([^\s#]+)/gm)].map(match=>match[1]);
+  assert.ok(actionReferences.length>=11,'expected all workflow actions to be enumerated');
   for(const reference of actionReferences)assert.match(reference,/@[0-9a-f]{40}$/i,`GitHub Action must be pinned to a commit SHA: ${reference}`);
   assert.match(dependabot,/package-ecosystem: "npm"/);
   assert.match(dependabot,/package-ecosystem: "github-actions"/);

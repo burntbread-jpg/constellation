@@ -26,6 +26,7 @@ The source modules are concatenated deliberately. This preserves the existing br
 - Every third-party GitHub Action is pinned to an immutable 40-character commit SHA. Dependabot separately tracks the GitHub Actions ecosystem so those pins receive reviewed updates without restoring mutable tags.
 - `.github/workflows/codeql.yml` performs CodeQL static analysis for JavaScript and TypeScript on every push and pull request, plus a weekly scheduled scan. The extended security query suite publishes findings to GitHub code scanning with only read access to repository contents and narrowly scoped `security-events: write` permission.
 - `.github/workflows/secret-scan.yml` checks the complete Git history for exposed credentials on every push and pull request, plus a weekly scheduled scan. Gitleaks runs with read-only repository permission, does not post pull-request comments, and does not upload a potentially sensitive finding artifact.
+- `.github/workflows/sbom.yml` generates a CycloneDX JSON software bill of materials for every push and pull request, plus a weekly scheduled inventory. A pinned Syft release produces the document, which is retained as a GitHub Actions artifact for 30 days without granting release or dependency-graph write access.
 
 ## Operational health
 
