@@ -193,6 +193,7 @@ test('public leaderboard uses an invoker view over a private sanitized projectio
 test('GitHub Actions blocks build, recommendation, security, accessibility, and performance regressions',async()=>{
   const workflow=await readFile(new URL('../.github/workflows/quality.yml',import.meta.url),'utf8');
   const codeql=await readFile(new URL('../.github/workflows/codeql.yml',import.meta.url),'utf8');
+  const secretScan=await readFile(new URL('../.github/workflows/secret-scan.yml',import.meta.url),'utf8');
   const dependabot=await readFile(new URL('../.github/dependabot.yml',import.meta.url),'utf8');
   assert.match(workflow,/pull_request:/);
   assert.match(workflow,/push:\s*\n\s*branches:\s*\n\s*- master/);
@@ -215,8 +216,16 @@ test('GitHub Actions blocks build, recommendation, security, accessibility, and 
   assert.match(codeql,/queries: security-extended/);
   assert.match(codeql,/github\/codeql-action\/init@[0-9a-f]{40}/i);
   assert.match(codeql,/github\/codeql-action\/analyze@[0-9a-f]{40}/i);
-  const actionReferences=[...`${workflow}\n${codeql}`.matchAll(/^\s*uses:\s*([^\s#]+)/gm)].map(match=>match[1]);
-  assert.ok(actionReferences.length>=6,'expected all workflow actions to be enumerated');
+  assert.match(secretScan,/name: Secret Leak Scan/);
+  assert.match(secretScan,/pull_request:[\s\S]*branches:[\s\S]*- master/);
+  assert.match(secretScan,/schedule:[\s\S]*cron: "5 1 \* \* 1"/);
+  assert.match(secretScan,/permissions:\s*\n\s*contents: read/);
+  assert.match(secretScan,/fetch-depth: 0/);
+  assert.match(secretScan,/gitleaks\/gitleaks-action@[0-9a-f]{40}/i);
+  assert.match(secretScan,/GITLEAKS_ENABLE_COMMENTS: "false"/);
+  assert.match(secretScan,/GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"/);
+  const actionReferences=[...`${workflow}\n${codeql}\n${secretScan}`.matchAll(/^\s*uses:\s*([^\s#]+)/gm)].map(match=>match[1]);
+  assert.ok(actionReferences.length>=8,'expected all workflow actions to be enumerated');
   for(const reference of actionReferences)assert.match(reference,/@[0-9a-f]{40}$/i,`GitHub Action must be pinned to a commit SHA: ${reference}`);
   assert.match(dependabot,/package-ecosystem: "npm"/);
   assert.match(dependabot,/package-ecosystem: "github-actions"/);
