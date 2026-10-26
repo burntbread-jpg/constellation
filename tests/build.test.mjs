@@ -192,6 +192,7 @@ test('public leaderboard uses an invoker view over a private sanitized projectio
 
 test('GitHub Actions blocks build, recommendation, security, accessibility, and performance regressions',async()=>{
   const workflow=await readFile(new URL('../.github/workflows/quality.yml',import.meta.url),'utf8');
+  const codeql=await readFile(new URL('../.github/workflows/codeql.yml',import.meta.url),'utf8');
   const dependabot=await readFile(new URL('../.github/dependabot.yml',import.meta.url),'utf8');
   assert.match(workflow,/pull_request:/);
   assert.match(workflow,/push:\s*\n\s*branches:\s*\n\s*- master/);
@@ -205,8 +206,17 @@ test('GitHub Actions blocks build, recommendation, security, accessibility, and 
   assert.match(workflow,/run: pnpm run test:e2e/);
   assert.match(workflow,/Build, test, security, accessibility, and performance/);
   assert.match(workflow,/git diff --exit-code -- dist quality\/reports/);
-  const actionReferences=[...workflow.matchAll(/^\s*uses:\s*([^\s#]+)/gm)].map(match=>match[1]);
-  assert.ok(actionReferences.length>=3,'expected all workflow actions to be enumerated');
+  assert.match(codeql,/name: CodeQL Security Analysis/);
+  assert.match(codeql,/pull_request:[\s\S]*branches:[\s\S]*- master/);
+  assert.match(codeql,/schedule:[\s\S]*cron: "35 0 \* \* 1"/);
+  assert.match(codeql,/permissions:\s*\n\s*contents: read\s*\n\s*security-events: write/);
+  assert.match(codeql,/languages: javascript-typescript/);
+  assert.match(codeql,/build-mode: none/);
+  assert.match(codeql,/queries: security-extended/);
+  assert.match(codeql,/github\/codeql-action\/init@[0-9a-f]{40}/i);
+  assert.match(codeql,/github\/codeql-action\/analyze@[0-9a-f]{40}/i);
+  const actionReferences=[...`${workflow}\n${codeql}`.matchAll(/^\s*uses:\s*([^\s#]+)/gm)].map(match=>match[1]);
+  assert.ok(actionReferences.length>=6,'expected all workflow actions to be enumerated');
   for(const reference of actionReferences)assert.match(reference,/@[0-9a-f]{40}$/i,`GitHub Action must be pinned to a commit SHA: ${reference}`);
   assert.match(dependabot,/package-ecosystem: "npm"/);
   assert.match(dependabot,/package-ecosystem: "github-actions"/);
