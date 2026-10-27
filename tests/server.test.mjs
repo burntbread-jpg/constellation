@@ -30,6 +30,7 @@ const state = {
   healthAlerts: [],
   healthAlertActions: [],
   webhookCalls: [],
+  rateBuckets: new Map(),
   catalogQueries: [],
   profileWrites: 0,
   backfillCalls: 0,
@@ -68,6 +69,12 @@ function mockSupabase(url, init = {}) {
   const body = init.body ? JSON.parse(init.body) : null;
 
   if (state.failHealth) return response({message: 'database unavailable'}, 500);
+
+  if(method==='POST'&&table==='consume_api_rate_limit'){
+    const key=body.p_bucket_key,limit=Number(body.p_limit),previous=state.rateBuckets.get(key)||0,count=previous+1;
+    state.rateBuckets.set(key,count);
+    return response([{allowed:count<=limit,request_count:count,limit_value:limit,remaining:Math.max(0,limit-count),retry_after:count<=limit?0:60,reset_at:new Date(Date.now()+60000).toISOString()}]);
+  }
 
   if(method==='POST'&&table==='health_check_runs'){
     const row={...body,id:state.healthChecks.length+1};state.healthChecks.unshift(row);return response([row]);
@@ -622,7 +629,23 @@ test('mutation rate limit returns a retry window', async () => {
   }), env);
   assert.equal(result.status, 429);
   assert.match(result.headers.get('retry-after'), /^\d+$/);
+  assert.equal(result.headers.get('x-ratelimit-policy'), 'distributed');
+  assert.equal(result.headers.get('x-ratelimit-remaining'), '0');
   assert.equal((await result.json()).retryAfter > 0, true);
+});
+
+test('distributed rate limits partition reads, writes, and endpoint routes without storing raw identities', async () => {
+  const identity='198.51.100.88',before=new Set(state.rateBuckets.keys());
+  const search=await worker.fetch(new Request('https://site.test/api/search?q=memory',{headers:{'cf-connecting-ip':identity}}),env);
+  const health=await worker.fetch(new Request('https://site.test/api/health',{headers:{'cf-connecting-ip':identity}}),env);
+  const write=await worker.fetch(new Request('https://site.test/api/unknown',{method:'POST',headers:{'cf-connecting-ip':identity,origin:'https://site.test'},body:'{}'}),env);
+  assert.equal(search.headers.get('x-ratelimit-policy'),'distributed');
+  assert.equal(search.headers.get('x-ratelimit-limit'),'180');
+  assert.equal(write.headers.get('x-ratelimit-limit'),'30');
+  const created=[...state.rateBuckets.keys()].filter(key=>!before.has(key));
+  assert.equal(created.length,3);
+  for(const key of created){assert.match(key,/^[a-f0-9]{64}$/);assert.equal(key.includes(identity),false)}
+  assert.equal(health.status,200);
 });
 
 test('artwork chooses a high resolution Korean official film poster', async () => {

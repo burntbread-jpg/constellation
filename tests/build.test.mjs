@@ -224,6 +224,7 @@ test('GitHub Actions blocks build, recommendation, security, accessibility, and 
   assert.match(workflow,/timeout-minutes: 15/);
   assert.match(workflow,/run: npm run check/);
   assert.match(workflow,/run: npm run eval:recommendations/);
+  assert.match(workflow,/run: npm run perf:baseline/);
   assert.match(workflow,/pnpm install --frozen-lockfile/);
   assert.match(workflow,/pnpm run audit:dependencies/);
   assert.match(workflow,/playwright install --with-deps chromium/);
@@ -374,4 +375,30 @@ test('privileged database functions use only fixed trusted search paths',async()
     assert.match(migration,new RegExp(`alter function public\\.${name}\\([\\s\\S]*?set search_path = (?:''|pg_catalog, extensions)`));
     assert.match(migration,new RegExp(`revoke all on function public\\.${name}\\(`));
   }
+});
+
+test('distributed rate limiting is atomic, private, and shared through Supabase',async()=>{
+  const router=await readFile(new URL('../src/server/06-router.js',import.meta.url),'utf8');
+  const migration=await readFile(new URL('../supabase/migrations/20261027_stage68_distributed_rate_limit.sql',import.meta.url),'utf8');
+  assert.match(router,/rpc\/consume_api_rate_limit/);
+  assert.match(router,/crypto\.subtle\.digest\('SHA-256'/);
+  assert.match(router,/x-ratelimit-policy/);
+  assert.match(router,/local-fallback/);
+  assert.match(migration,/on conflict \(bucket_key\) do update/);
+  assert.match(migration,/enable row level security/);
+  assert.match(migration,/revoke all on public\.api_rate_limit_buckets from public, anon, authenticated/);
+  assert.match(migration,/grant execute on function public\.consume_api_rate_limit\(text, integer, integer\) to service_role/);
+  assert.match(migration,/set search_path = ''/);
+});
+
+test('performance baseline covers API concurrency and production database plans',async()=>{
+  const script=await readFile(new URL('../scripts/performance-baseline.mjs',import.meta.url),'utf8');
+  const budgets=await readFile(new URL('../quality/performance-budgets.md',import.meta.url),'utf8');
+  const database=await readFile(new URL('../quality/reports/database-performance-baseline.md',import.meta.url),'utf8');
+  for(const path of ['health','search','archive','recommendations'])assert.match(script,new RegExp(`${path}:`));
+  assert.match(script,/\[1,10,50\]/);
+  assert.match(script,/p95/);assert.match(script,/p99/);
+  assert.match(budgets,/Any p95 or p99 breach fails CI/);
+  assert.match(database,/EXPLAIN \(ANALYZE, BUFFERS\)/);
+  assert.match(database,/works_taste_vector_idx/);
 });

@@ -9,7 +9,9 @@
     "test:e2e": "playwright test",
     "audit:dependencies": "pnpm audit --audit-level high",
     "check": "npm run build && npm test",
-    "eval:recommendations": "node scripts/evaluate-recommendations.mjs --write"
+    "eval:recommendations": "node scripts/evaluate-recommendations.mjs --write",
+    "perf:baseline": "node scripts/performance-baseline.mjs",
+    "perf:baseline:write": "node scripts/performance-baseline.mjs --write"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",

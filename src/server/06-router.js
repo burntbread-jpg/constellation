@@ -140,9 +140,10 @@ function requestId(request){
   return crypto.randomUUID();
 }
 
-function finishResponse(response,id,startedAt){
+function finishResponse(response,id,startedAt,rateHeaders){
   const headers=new Headers(response.headers);
   for(const[key,value]of Object.entries(SECURITY_HEADERS))headers.set(key,value);
+  for(const[key,value]of Object.entries(rateHeaders||{}))headers.set(key,String(value));
   headers.set('x-request-id',id);
   headers.set('server-timing',`app;dur=${Math.max(0,performance.now()-startedAt).toFixed(1)}`);
   return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
@@ -163,18 +164,34 @@ function validateMutation(request,url){
   return null;
 }
 
-function rateLimit(request){
-  const mutating=['POST','PATCH','DELETE'].includes(request.method),limit=mutating?30:180,windowMs=60000;
-  const identity=request.headers.get('oai-authenticated-user-id')||request.headers.get('oai-authenticated-user-email')||request.headers.get('cf-connecting-ip')||'anonymous';
-  const key=`${mutating?'write':'read'}:${identity}`,now=Date.now();
+function localRateLimit(key,limit,windowMs=60000){
+  const now=Date.now();
   let bucket=RATE_BUCKETS.get(key);
   if(!bucket||now-bucket.startedAt>=windowMs)bucket={startedAt:now,count:0};
   bucket.count++;RATE_BUCKETS.set(key,bucket);
   if(RATE_BUCKETS.size>2000)for(const[item,value]of RATE_BUCKETS)if(now-value.startedAt>=windowMs)RATE_BUCKETS.delete(item);
-  if(bucket.count<=limit)return null;
-  const retryAfter=Math.max(1,Math.ceil((windowMs-(now-bucket.startedAt))/1000)),response=json({error:'요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.',retryAfter},429);
+  return{allowed:bucket.count<=limit,count:bucket.count,remaining:Math.max(0,limit-bucket.count),retryAfter:Math.max(1,Math.ceil((windowMs-(now-bucket.startedAt))/1000)),resetAt:new Date(bucket.startedAt+windowMs).toISOString(),policy:'local-fallback'};
+}
+
+async function rateLimit(request,env,url){
+  const mutating=['POST','PATCH','DELETE'].includes(request.method),limit=mutating?30:180,windowSeconds=60,scope=mutating?'write':'read';
+  const identity=request.headers.get('oai-authenticated-user-id')||request.headers.get('oai-authenticated-user-email')||request.headers.get('cf-connecting-ip')||'anonymous';
+  const route=url.pathname.replace(/\/[0-9a-f-]{8,}$/i,'/:id').replace(/\/\d+$/,'/:id'),material=`taste-rate-v2:${scope}:${route}:${identity}`;
+  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(material)),bucketKey=[...new Uint8Array(digest)].map(value=>value.toString(16).padStart(2,'0')).join('');
+  let result;
+  if(dbReady(env))try{
+    const rows=await supabase(env,'rpc/consume_api_rate_limit',{method:'POST',body:{p_bucket_key:bucketKey,p_limit:limit,p_window_seconds:windowSeconds}}),row=Array.isArray(rows)?rows[0]:rows;
+    if(!row||typeof row.allowed!=='boolean')throw new Error('Invalid distributed rate-limit response');
+    result={allowed:row.allowed,count:Number(row.request_count)||0,remaining:Math.max(0,Number(row.remaining)||0),retryAfter:Math.max(0,Number(row.retry_after)||0),resetAt:row.reset_at,policy:'distributed'};
+  }catch(error){
+    console.error('Distributed rate limit unavailable; using local fallback',{message:error instanceof Error?error.message:String(error)});
+    result=localRateLimit(bucketKey,limit,windowSeconds*1000);
+  }else result=localRateLimit(bucketKey,limit,windowSeconds*1000);
+  const headers={'x-ratelimit-limit':limit,'x-ratelimit-remaining':result.remaining,'x-ratelimit-reset':result.resetAt||'','x-ratelimit-policy':result.policy};
+  if(result.allowed)return{response:null,headers};
+  const retryAfter=Math.max(1,result.retryAfter),response=json({error:'요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.',retryAfter},429);
   response.headers.set('retry-after',String(retryAfter));
-  return response;
+  return{response,headers};
 }
 
 async function publicMetadata(response,maxAge){
@@ -291,13 +308,14 @@ export default{
     const startedAt=performance.now(),id=requestId(request);
     try{
       const url=new URL(request.url);
-      const rejected=url.pathname.startsWith('/api/')?(rateLimit(request)||validateMutation(request,url)):null;
+      const limited=url.pathname.startsWith('/api/')?await rateLimit(request,env,url):null;
+      const rejected=url.pathname.startsWith('/api/')?(limited?.response||validateMutation(request,url)):null;
       const response=url.pathname.startsWith('/api/')
         ?rejected||await routeApi(request,env,url)
         :env.ASSETS?await env.ASSETS.fetch(request):new Response('Not found',{status:404});
       const duration=performance.now()-startedAt;
       if(url.pathname.startsWith('/api/'))recordApiHealth(response.status,duration);
-      return finishResponse(response,id,startedAt);
+      return finishResponse(response,id,startedAt,limited?.headers);
     }catch(error){
       console.error('Request failed',{
         requestId:id,

@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "kind": "deterministic-worker-baseline",
+  "generatedAt": "2026-10-27T13:12:39.789Z",
+  "runtime": "v24.22.1",
+  "budgets": {
+    "health": {
+      "p95": 25,
+      "p99": 50
+    },
+    "search": {
+      "p95": 75,
+      "p99": 150
+    },
+    "archive": {
+      "p95": 60,
+      "p99": 120
+    },
+    "recommendations": {
+      "p95": 150,
+      "p99": 300
+    }
+  },
+  "results": {
+    "health": {
+      "c1": {
+        "samples": 60,
+        "concurrency": 1,
+        "p50": 0.22,
+        "p95": 0.41,
+        "p99": 0.5,
+        "max": 0.5,
+        "statuses": [
+          200
+        ]
+      },
+      "c10": {
+        "samples": 60,
+        "concurrency": 10,
+        "p50": 0.94,
+        "p95": 1.43,
+        "p99": 1.58,
+        "max": 1.58,
+        "statuses": [
+          200
+        ]
+      },
+      "c50": {
+        "samples": 60,
+        "concurrency": 50,
+        "p50": 3.37,
+        "p95": 7.69,
+        "p99": 8.22,
+        "max": 8.22,
+        "statuses": [
+          200
+        ]
+      }
+    },
+    "search": {
+      "c1": {
+        "samples": 60,
+        "concurrency": 1,
+        "p50": 0.27,
+        "p95": 0.77,
+        "p99": 1.74,
+        "max": 1.74,
+        "statuses": [
+          200
+        ]
+      },
+      "c10": {
+        "samples": 60,
+        "concurrency": 10,
+        "p50": 1.19,
+        "p95": 2,
+        "p99": 2.23,
+        "max": 2.23,
+        "statuses": [
+          200
+        ]
+      },
+      "c50": {
+        "samples": 60,
+        "concurrency": 50,
+        "p50": 4.65,
+        "p95": 8.7,
+        "p99": 9.09,
+        "max": 9.09,
+        "statuses": [
+          200
+        ]
+      }
+    },
+    "archive": {
+      "c1": {
+        "samples": 60,
+        "concurrency": 1,
+        "p50": 0.15,
+        "p95": 0.29,
+        "p99": 0.42,
+        "max": 0.42,
+        "statuses": [
+          200
+        ]
+      },
+      "c10": {
+        "samples": 60,
+        "concurrency": 10,
+        "p50": 0.73,
+        "p95": 1.21,
+        "p99": 1.41,
+        "max": 1.41,
+        "statuses": [
+          200
+        ]
+      },
+      "c50": {
+        "samples": 60,
+        "concurrency": 50,
+        "p50": 3.27,
+        "p95": 6.09,
+        "p99": 6.28,
+        "max": 6.28,
+        "statuses": [
+          200
+        ]
+      }
+    },
+    "recommendations": {
+      "c1": {
+        "samples": 60,
+        "concurrency": 1,
+        "p50": 3.07,
+        "p95": 4.07,
+        "p99": 4.9,
+        "max": 4.9,
+        "statuses": [
+          200
+        ]
+      },
+      "c10": {
+        "samples": 60,
+        "concurrency": 10,
+        "p50": 16.02,
+        "p95": 29.12,
+        "p99": 32.25,
+        "max": 32.25,
+        "statuses": [
+          200
+        ]
+      },
+      "c50": {
+        "samples": 60,
+        "concurrency": 50,
+        "p50": 59.32,
+        "p95": 135.39,
+        "p99": 143.54,
+        "max": 143.54,
+        "statuses": [
+          200
+        ]
+      }
+    }
+  },
+  "passed": true,
+  "failures": []
+}

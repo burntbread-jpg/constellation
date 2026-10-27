@@ -49,6 +49,9 @@ jobs:
       - name: Evaluate recommendation quality
         run: npm run eval:recommendations
 
+      - name: Enforce API latency budgets
+        run: npm run perf:baseline
+
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
 
