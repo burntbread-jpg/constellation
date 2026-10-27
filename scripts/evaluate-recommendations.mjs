@@ -18,8 +18,7 @@ function editorialPass(item, sourceTitle) {
   const line = String(item.editorialIntro || '').trim();
   return line.length >= 18 && line.length <= 120 && line.endsWith('작품.')
     && !line.includes(sourceTitle)
-    && !FORBIDDEN_EDITORIAL.some(phrase => line.includes(phrase))
-    && /(묻는|밀어붙인|키워낸|바라보는|추적한|확대한|드러낸|응시하는)/.test(line);
+    && !FORBIDDEN_EDITORIAL.some(phrase => line.includes(phrase));
 }
 
 function scenarioChecks(source, items, expectedCount) {

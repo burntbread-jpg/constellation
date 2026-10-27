@@ -19,9 +19,9 @@
     "scenarioPassRate": 1,
     "tagAlignment": 0.9311,
     "crossMediaRate": 1,
-    "modeDifferentiation": 0.9,
+    "modeDifferentiation": 0.9067,
     "editorialQuality": 1,
-    "perCaseUniqueRate": 0.4356
+    "perCaseUniqueRate": 0.4289
   },
   "perMode": {
     "story": {
@@ -39,7 +39,7 @@
     "idea": {
       "scenarios": 30,
       "passRate": 1,
-      "tagAlignment": 0.9667,
+      "tagAlignment": 0.9778,
       "crossMediaRate": 1
     },
     "visual": {
@@ -51,7 +51,7 @@
     "deep": {
       "scenarios": 30,
       "passRate": 1,
-      "tagAlignment": 0.9667,
+      "tagAlignment": 0.9556,
       "crossMediaRate": 1
     }
   },
@@ -94,8 +94,8 @@
     {
       "id": "eval:film:her",
       "title": "Her",
-      "modeDifferentiation": 0.8,
-      "uniqueRate": 0.3333
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.2667
     },
     {
       "id": "eval:anime:lain",
@@ -130,7 +130,7 @@
     {
       "id": "eval:film:melancholia",
       "title": "멜랑콜리아",
-      "modeDifferentiation": 0.8,
+      "modeDifferentiation": 1,
       "uniqueRate": 0.3333
     },
     {
@@ -143,13 +143,13 @@
       "id": "eval:book:childhoods-end",
       "title": "유년기의 끝",
       "modeDifferentiation": 1,
-      "uniqueRate": 0.5333
+      "uniqueRate": 0.6
     },
     {
       "id": "eval:film:eternal-sunshine",
       "title": "이터널 선샤인",
       "modeDifferentiation": 1,
-      "uniqueRate": 0.4667
+      "uniqueRate": 0.4
     },
     {
       "id": "eval:anime:gunbuster",
@@ -160,14 +160,14 @@
     {
       "id": "eval:book:left-hand-darkness",
       "title": "어둠의 왼손",
-      "modeDifferentiation": 1,
-      "uniqueRate": 0.4
+      "modeDifferentiation": 0.8,
+      "uniqueRate": 0.3333
     },
     {
       "id": "eval:film:2001",
       "title": "2001 스페이스 오디세이",
       "modeDifferentiation": 1,
-      "uniqueRate": 0.4667
+      "uniqueRate": 0.4
     },
     {
       "id": "eval:book:never-let-me-go",
@@ -203,7 +203,7 @@
       "id": "eval:manga:parasyte",
       "title": "기생수",
       "modeDifferentiation": 1,
-      "uniqueRate": 0.6667
+      "uniqueRate": 0.6
     },
     {
       "id": "eval:anime:fullmetal",
@@ -233,7 +233,7 @@
       "id": "eval:book:frankenstein",
       "title": "프랑켄슈타인",
       "modeDifferentiation": 1,
-      "uniqueRate": 0.4
+      "uniqueRate": 0.4667
     },
     {
       "id": "eval:film:children-men",

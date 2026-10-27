@@ -276,7 +276,7 @@ async function routeApi(request,env,url){
       sources:{
         tmdb:!!env.TMDB_READ_TOKEN,googleBooks:!!env.GOOGLE_BOOKS_API_KEY,openLibrary:true,aniList:true,wikidata:true,
         supabase:dbReady(env),culturalContext:'wikidata-authority-catalog-v2',publisherEngine:'korean-editions-v1',
-        editorialEngine:'metadata-editorial-v1',artworkEngine:'official-artwork-ranking-v1',
+        editorialEngine:'curated-metadata-editorial-v2',artworkEngine:'official-artwork-ranking-v2',
         awardCatalog:{literature:10,film:12,animation:7},tasteEngine:'taste-profile-feedback-v2',
         similarityEngine:'pgvector-cosine-v1',recommendationEngine:'pgvector-catalog-feedback-v1',
         archiveEngine:'archive-management-v1',catalogDimensions:LEXICON.length

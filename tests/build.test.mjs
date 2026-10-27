@@ -42,6 +42,20 @@ test('archive library displays the editorial Bridge Score instead of graph centr
   assert.doesNotMatch(source, /archiveBridgeScore\(work\.id\)\*100/);
 });
 
+test('saved archive metadata cannot overwrite curated launch copy', async () => {
+  const archive = await readFile(new URL('../src/client/03-archive.js', import.meta.url), 'utf8');
+  assert.match(archive, /works\[w\.id\]=\{\.\.\.w,\.\.\.works\[w\.id\]\}/);
+  assert.match(archive, /works\[current\]=\{\.\.\.data\.work,\.\.\.works\[current\]\}/);
+});
+
+test('catalog migration stores editorial hooks and repairs verified anime covers', async () => {
+  const migration = await readFile(new URL('../supabase/migrations/20261026_stage72_catalog_artwork_editorial.sql', import.meta.url), 'utf8');
+  assert.match(migration, /add column if not exists editorial_intro text/);
+  assert.match(migration, /고슴도치의 딜레마를 세계의 종말까지 밀어붙인 작품/);
+  assert.match(migration, /fallback:anime:perfect-blue/);
+  assert.match(migration, /editorial_intro = coalesce\(excluded\.editorial_intro/);
+});
+
 test('PWA shell and HTML request the same current client bundle', async () => {
   const html = await readFile(new URL('../dist/client/index.html', import.meta.url), 'utf8');
   const worker = await readFile(new URL('../dist/client/service-worker.js', import.meta.url), 'utf8');

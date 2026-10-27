@@ -459,8 +459,8 @@ test('health reports free providers and configured persistence', async () => {
   assert.equal(data.sources.wikidata, true);
   assert.equal(data.sources.culturalContext, 'wikidata-authority-catalog-v2');
   assert.equal(data.sources.publisherEngine, 'korean-editions-v1');
-  assert.equal(data.sources.editorialEngine, 'metadata-editorial-v1');
-  assert.equal(data.sources.artworkEngine, 'official-artwork-ranking-v1');
+  assert.equal(data.sources.editorialEngine, 'curated-metadata-editorial-v2');
+  assert.equal(data.sources.artworkEngine, 'official-artwork-ranking-v2');
   assert.deepEqual(data.sources.awardCatalog, {literature: 10, film: 12, animation: 7});
   assert.equal(data.sources.tasteEngine, 'taste-profile-feedback-v2');
   assert.equal(data.sources.recommendationEngine, 'pgvector-catalog-feedback-v1');
@@ -699,8 +699,36 @@ test('editorial intro compresses a work into conflict, motif, and escalation', a
   assert.equal(result.status, 200);
   const data = await result.json();
   assert.equal(data.text, '잃어버린 것을 붙잡으려는 마음을 기억이 스스로를 배반하는 순간까지 밀어붙인 작품.');
-  assert.equal(data.engine, 'metadata-editorial-v1');
+  assert.equal(data.engine, 'metadata-editorial-v2');
   assert.equal(data.cost, 'free');
+});
+
+test('editorial intro preserves the curated Evangelion hook', async () => {
+  const result = await worker.fetch(new Request('https://site.test/api/editorial-intro', {
+    method: 'POST',
+    headers: {'content-type': 'application/json'},
+    body: JSON.stringify({work: {
+      id: 'anilist:30', title: '신세기 에반게리온', creator: '안노 히데아키', mediaType: 'ANIME'
+    }})
+  }), env);
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.text, '고슴도치의 딜레마를 세계의 종말까지 밀어붙인 작품.');
+  assert.equal(data.engine, 'curated-editorial-v2');
+});
+
+test('curated editorial hooks never leak into a same-title different medium', async () => {
+  const result = await worker.fetch(new Request('https://site.test/api/editorial-intro', {
+    method: 'POST',
+    headers: {'content-type': 'application/json'},
+    body: JSON.stringify({work: {
+      id: 'book:perfect-blue', title: '퍼펙트 블루', creator: '미야베 미유키', mediaType: 'BOOK'
+    }})
+  }), env);
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.notEqual(data.text, '스타의 얼굴을 여러 거울에 깨뜨려 진짜 내가 어느 조각인지 묻는 작품.');
+  assert.equal(data.engine, 'metadata-editorial-v2');
 });
 
 test('cultural context rejects an ambiguous Wikidata candidate', async () => {
