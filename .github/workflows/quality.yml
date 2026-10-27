@@ -52,6 +52,9 @@ jobs:
       - name: Enforce API latency budgets
         run: npm run perf:baseline
 
+      - name: Verify disaster recovery readiness
+        run: npm run dr:verify
+
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
 

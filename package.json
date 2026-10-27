@@ -11,7 +11,10 @@
     "check": "npm run build && npm test",
     "eval:recommendations": "node scripts/evaluate-recommendations.mjs --write",
     "perf:baseline": "node scripts/performance-baseline.mjs",
-    "perf:baseline:write": "node scripts/performance-baseline.mjs --write"
+    "perf:baseline:write": "node scripts/performance-baseline.mjs --write",
+    "backup:export": "node scripts/export-supabase-backup.mjs",
+    "dr:verify": "node scripts/verify-recovery-readiness.mjs",
+    "dr:verify:write": "node scripts/verify-recovery-readiness.mjs --write"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",

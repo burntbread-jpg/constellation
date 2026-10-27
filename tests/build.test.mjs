@@ -225,6 +225,7 @@ test('GitHub Actions blocks build, recommendation, security, accessibility, and 
   assert.match(workflow,/run: npm run check/);
   assert.match(workflow,/run: npm run eval:recommendations/);
   assert.match(workflow,/run: npm run perf:baseline/);
+  assert.match(workflow,/run: npm run dr:verify/);
   assert.match(workflow,/pnpm install --frozen-lockfile/);
   assert.match(workflow,/pnpm run audit:dependencies/);
   assert.match(workflow,/playwright install --with-deps chromium/);
@@ -401,4 +402,18 @@ test('performance baseline covers API concurrency and production database plans'
   assert.match(budgets,/Any p95 or p99 breach fails CI/);
   assert.match(database,/EXPLAIN \(ANALYZE, BUFFERS\)/);
   assert.match(database,/works_taste_vector_idx/);
+});
+
+test('disaster recovery has private logical exports, checksum verification, and a tested runbook',async()=>{
+  const exporter=await readFile(new URL('../scripts/export-supabase-backup.mjs',import.meta.url),'utf8');
+  const verifier=await readFile(new URL('../scripts/verify-recovery-readiness.mjs',import.meta.url),'utf8');
+  const runbook=await readFile(new URL('../quality/DISASTER_RECOVERY.md',import.meta.url),'utf8');
+  const ignore=await readFile(new URL('../.gitignore',import.meta.url),'utf8');
+  assert.match(exporter,/SUPABASE_SERVICE_ROLE_KEY/);
+  assert.match(exporter,/gzipSync/);assert.match(exporter,/sha256/);assert.match(exporter,/mode:0o600/);
+  assert.match(exporter,/console\.log\(JSON\.stringify\(\{archivePath,manifestPath,sha256:archiveHash,tables:tableManifest\},null,2\)\)/);
+  assert.match(verifier,/recovery readiness report is stale/);
+  assert.match(runbook,/목표 RPO/);assert.match(runbook,/목표 RTO/);assert.match(runbook,/격리 환경/);
+  assert.match(runbook,/Storage 객체/);assert.match(runbook,/쓰기를 재개하지 않고/);
+  assert.match(ignore,/\.backups\//);
 });

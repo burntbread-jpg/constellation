@@ -1,0 +1,151 @@
+{
+  "version": 1,
+  "migrationCount": 25,
+  "migrations": [
+    {
+      "name": "20261005_stage15_archive_management.sql",
+      "sha256": "922519192633d6f2cacff215d023a2585fdcff27cef06e59ce5385b504abe96a",
+      "bytes": 502
+    },
+    {
+      "name": "20261009_fix_save_archive_analysis.sql",
+      "sha256": "9af3ca8606a1b06e6cac9107f59e5367d36784300842b546b156262ff41524c0",
+      "bytes": 2254
+    },
+    {
+      "name": "20261009_stage32_metadata_identity.sql",
+      "sha256": "18d26eca7d7ebe66d214ee4c1efb39a93343ea7ab0e55819029626d2e3949253",
+      "bytes": 963
+    },
+    {
+      "name": "20261009_stage33_metadata_review.sql",
+      "sha256": "731f20845dfb4eb7c2e507f4298905efe91d0593b6b081031c29739d337d1c46",
+      "bytes": 162
+    },
+    {
+      "name": "20261009_stage34_metadata_history.sql",
+      "sha256": "b7510bd5a5bbfa8b06f8e1d26876287c922ebd74ad95ecf94f62cb0eb4bc1a97",
+      "bytes": 936
+    },
+    {
+      "name": "20261009_support_sites_profiles.sql",
+      "sha256": "0ae330efafdf95b3980c27518a80e77ab208748983fb5f3601707e1c3dfcb063",
+      "bytes": 301
+    },
+    {
+      "name": "20261010_stage37_metadata_provenance.sql",
+      "sha256": "1717a67b50dfca1d436ed2639015c82bc5c809e3d91636df614c2113e89dc88d",
+      "bytes": 1075
+    },
+    {
+      "name": "20261011_stage46_3_duplicate_merge.sql",
+      "sha256": "0ed08422bc157b1e96e21598f157c73537fe021ef34d463ec6127aa923561571",
+      "bytes": 9291
+    },
+    {
+      "name": "20261011_stage48_duplicate_merge_recovery.sql",
+      "sha256": "6196d660f930ab7b50fbadea0471ffa3fd88e52851156c5c0ff624968d95d9e4",
+      "bytes": 1810
+    },
+    {
+      "name": "20261012_stage50_identity_exceptions.sql",
+      "sha256": "5f4223acc20e98931619a97bfa1e63926aa97f5ce8c11d8ea110b753619bdda5",
+      "bytes": 858
+    },
+    {
+      "name": "20261013_stage51_harden_metadata_trigger.sql",
+      "sha256": "ea860ceafd0852dfaf09b0c57135930b6cdcf0de19e407af2507266b0540f88d",
+      "bytes": 339
+    },
+    {
+      "name": "20261013_stage52_index_foreign_keys.sql",
+      "sha256": "29ed25423d9bf1168c676253068a625082797ffae2ee3d38f1bd938c457a22a2",
+      "bytes": 276
+    },
+    {
+      "name": "20261013_stage53_explicit_client_denies.sql",
+      "sha256": "092378bf52698155930f83471fa4c614bbb29fdfb34eaee3dffc20a9d6ec57bc",
+      "bytes": 856
+    },
+    {
+      "name": "20261013_stage54_harden_privileged_functions.sql",
+      "sha256": "6c795dca559145e635e2608326f80cfd2f9698239149bdb9f8199296f71f274e",
+      "bytes": 2509
+    },
+    {
+      "name": "20261014_stage58_health_check_history.sql",
+      "sha256": "e1e73499cfa2ad3c8d26c7eaea6781cc1261bdc17eab97b52c62ca8e67806822",
+      "bytes": 1076
+    },
+    {
+      "name": "20261019_stage59_health_alerts.sql",
+      "sha256": "1fa34c721dc2c64183452530cfec2effd7c3380e4f1ac2c58aa0759bdae8fca6",
+      "bytes": 1210
+    },
+    {
+      "name": "20261019_stage61_alert_acknowledgement.sql",
+      "sha256": "23631dbbc1ed62a7c67a9e705d77d114cbb03da836d1f65fdfc6c31699187afd",
+      "bytes": 949
+    },
+    {
+      "name": "20261022022950_stage62_incident_lifecycle.sql",
+      "sha256": "149724af3956d809e58355f7d25842e2d0cbb9890a960acc1befd9462d173c31",
+      "bytes": 4226
+    },
+    {
+      "name": "20261022150541_stage63_secure_leaderboard.sql",
+      "sha256": "229eaef19e9760a55ec70b8f73bcf73d0d6a893af8808492914b95f5a5549d7b",
+      "bytes": 3798
+    },
+    {
+      "name": "20261026_stage72_catalog_artwork_editorial.sql",
+      "sha256": "58b27bc372bbc3bd838466e899424325dea0700388e54f804c226ca5de492752",
+      "bytes": 9409
+    },
+    {
+      "name": "20261026_stage72_editorial_media_scope.sql",
+      "sha256": "f2f73100d5596de2b4f250e51ac55a390b6db0d7e67f0a1485fd1fdbb39d3357",
+      "bytes": 554
+    },
+    {
+      "name": "20261027_stage67_performance_indexes.sql",
+      "sha256": "83eb949e420b92d02f7d8ea5c16443601032a566f20c439262d4d788ddd76bd3",
+      "bytes": 290
+    },
+    {
+      "name": "20261027_stage68_distributed_rate_limit.sql",
+      "sha256": "f0d4c1c9892f356543a3c732b97d4c9966c646b3caccb7b19d8735a9f0172de7",
+      "bytes": 3000
+    },
+    {
+      "name": "20261027_stage68_rate_limit_deny_policy.sql",
+      "sha256": "7f7100a75076a2aa54d92bb8f41dafbd74941fbccb87b840d9e29ca3add9cfd4",
+      "bytes": 333
+    },
+    {
+      "name": "20261027_stage72_korean_book_covers.sql",
+      "sha256": "bf4b7e8dfab6a8b0433d09004b15d2f72e01c845cd6342d80df5de92ed391eef",
+      "bytes": 1548
+    }
+  ],
+  "schemaSha256": "1d8249acbc060a055afdd809b487a2a3db588ed044917855d86d95979c24047b",
+  "requiredTables": [
+    "profiles",
+    "works",
+    "archive_items",
+    "taste_tags",
+    "connections",
+    "recommendation_feedback",
+    "metadata_reports",
+    "metadata_changes"
+  ],
+  "requiredFunctions": [
+    "save_archive_analysis",
+    "match_work_catalog",
+    "taste_similarity_edges",
+    "consume_api_rate_limit"
+  ],
+  "archiveBackupVersion": 1,
+  "passed": true,
+  "failures": []
+}

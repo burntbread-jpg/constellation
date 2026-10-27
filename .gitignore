@@ -1,3 +1,5 @@
 node_modules/
 playwright-report/
 test-results/
+.backups/
+*.json.gz.sha256
