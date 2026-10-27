@@ -56,6 +56,13 @@ test('catalog migration stores editorial hooks and repairs verified anime covers
   assert.match(migration, /editorial_intro = coalesce\(excluded\.editorial_intro/);
 });
 
+test('reviewed Korean book editions have durable cover repairs', async () => {
+  const migration = await readFile(new URL('../supabase/migrations/20261027_stage72_korean_book_covers.sql', import.meta.url), 'utf8');
+  assert.match(migration, /fallback:book:never-let-me-go/);
+  assert.match(migration, /fallback:book:beloved/);
+  assert.match(migration, /books\.google\.com\/books\/content/);
+});
+
 test('PWA shell and HTML request the same current client bundle', async () => {
   const html = await readFile(new URL('../dist/client/index.html', import.meta.url), 'utf8');
   const worker = await readFile(new URL('../dist/client/service-worker.js', import.meta.url), 'utf8');
