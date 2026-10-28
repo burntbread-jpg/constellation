@@ -140,7 +140,39 @@ function localAiPublicWork(work){return{title:String(work.title||'').slice(0,180
 function parseLocalAiJson(value){const text=String(value||'').trim().replace(/<think>[\s\S]*?<\/think>/gi,'').replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();try{return JSON.parse(text)}catch{const start=text.indexOf('{'),end=text.lastIndexOf('}');if(start<0||end<=start)return null;try{return JSON.parse(text.slice(start,end+1))}catch{return null}}}
 function validateLocalAiIntro(value,work){const text=String(value||'').replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim().replace(/^[“\"]|[”\"]$/g,'');if(text.length<18||text.length>100||!text.endsWith('작품.'))return null;const banned=/생각하게 하는|질문을 던지는|여운을 남기는|선명하게 드러|존재론|인식론|변증법|기표|기의|해체주의|실존주의|내러티브|메타포|범인은|정체는|결말에서|죽는다는/;if(banned.test(text)||text.includes(`${work.title}에서`))return null;return text}
 function validateLocalAiTags(value){const allowed=new Map(LEXICON.map(([tag,category])=>[tag,category])),items=Array.isArray(value)?value:[],seen=new Set,result=[];for(const item of items){const tag=String(typeof item==='string'?item:item?.tag||'').trim(),category=allowed.get(tag);if(!category||seen.has(tag))continue;seen.add(tag);result.push({tag,category,score:Number(Math.max(.5,Math.min(.92,Number(item?.score)||.72)).toFixed(2)),evidence:'공개 작품 메타데이터'});if(result.length===8)break}return result.length>=3?result:[]}
-async function localAiCandidate(work,env){const config=localAiConfig(env);if(!config.enabled)return null;const publicWork=localAiPublicWork(work),cacheKey=`${config.model}:${stableHash(JSON.stringify(publicWork))}`;if(LOCAL_AI_CACHE.has(cacheKey))return LOCAL_AI_CACHE.get(cacheKey);const task=(async()=>{try{const response=await fetch(config.endpoint,{method:'POST',headers:{'content-type':'application/json',...(env.LOCAL_AI_BEARER_TOKEN?{authorization:`Bearer ${env.LOCAL_AI_BEARER_TOKEN}`}:{})},body:JSON.stringify({model:config.model,temperature:.25,max_tokens:320,messages:[{role:'system',content:'너는 한국어 작품 추천 편집자다. 공개 작품 정보만 사용한다. 다른 설명이나 사고 과정 없이 유효한 JSON 객체 하나만 반환한다. intro는 스포일러 없이 구체적인 사물·공간·행동의 비유로 작품의 핵심 갈등을 18~100자 한 문장으로 압축하고 반드시 "작품."으로 끝낸다. 현학적 용어, 상투적 감상, 제목 반복을 피한다. tags는 허용 목록에서만 3~8개 선택한다.'},{role:'user',content:JSON.stringify({work:publicWork,allowedTags:LEXICON.map(([tag])=>tag),output:{intro:'string',tags:[{tag:'string',score:.5}]}})}]}),signal:AbortSignal.timeout(8000)});if(!response.ok)return{intro:null,tags:[],model:config.model,outcome:`provider_${response.status}`};const data=await response.json(),parsed=parseLocalAiJson(data?.choices?.[0]?.message?.content);if(!parsed)return{intro:null,tags:[],model:config.model,outcome:'invalid_json'};const intro=validateLocalAiIntro(parsed.intro,work),tags=validateLocalAiTags(parsed.tags);if(!intro&&tags.length<3)return{intro:null,tags:[],model:config.model,outcome:'quality_gate_rejected'};return{intro,tags,model:config.model,outcome:intro?'accepted':'tags_only'}}catch(error){const name=String(error?.name||'').toLowerCase(),outcome=name.includes('timeout')?'timeout':'provider_error';console.warn('Optional local AI assistant unavailable; deterministic fallback retained',{outcome});return{intro:null,tags:[],model:config.model,outcome}}})();LOCAL_AI_CACHE.set(cacheKey,task);if(LOCAL_AI_CACHE.size>200)LOCAL_AI_CACHE.delete(LOCAL_AI_CACHE.keys().next().value);return task}
+async function localAiCandidate(work,env){
+  const config=localAiConfig(env);
+  if(!config.enabled)return null;
+  const publicWork=localAiPublicWork(work),cacheKey=`${config.model}:${stableHash(JSON.stringify(publicWork))}`;
+  if(LOCAL_AI_CACHE.has(cacheKey))return LOCAL_AI_CACHE.get(cacheKey);
+  const task=(async()=>{
+    try{
+      const requestBody={
+        model:config.model,
+        temperature:.25,
+        max_tokens:480,
+        messages:[
+          {role:'system',content:'너는 한국어 작품 추천 편집자다. 공개 작품 정보만 사용한다. 다른 설명이나 사고 과정 없이 유효한 JSON 객체 하나만 반환한다. intro는 스포일러 없이 구체적인 사물·공간·행동의 비유로 작품의 핵심 갈등을 18~100자 한 문장으로 압축하고 반드시 "작품."으로 끝낸다. 현학적 용어, 상투적 감상, 제목 반복을 피한다. tags는 허용 목록에서만 3~8개 선택한다.'},
+          {role:'user',content:`/no_think\n${JSON.stringify({work:publicWork,allowedTags:LEXICON.map(([tag])=>tag),output:{intro:'string',tags:[{tag:'string',score:.5}]}})}`}
+        ]
+      };
+      const response=await fetch(config.endpoint,{method:'POST',headers:{'content-type':'application/json',...(env.LOCAL_AI_BEARER_TOKEN?{authorization:`Bearer ${env.LOCAL_AI_BEARER_TOKEN}`}:{})},body:JSON.stringify(requestBody),signal:AbortSignal.timeout(8000)});
+      if(!response.ok)return{intro:null,tags:[],model:config.model,outcome:`provider_${response.status}`};
+      const data=await response.json(),parsed=parseLocalAiJson(data?.choices?.[0]?.message?.content);
+      if(!parsed)return{intro:null,tags:[],model:config.model,outcome:'invalid_json'};
+      const intro=validateLocalAiIntro(parsed.intro,work),tags=validateLocalAiTags(parsed.tags);
+      if(!intro&&tags.length<3)return{intro:null,tags:[],model:config.model,outcome:'quality_gate_rejected'};
+      return{intro,tags,model:config.model,outcome:intro?'accepted':'tags_only'};
+    }catch(error){
+      const name=String(error?.name||'').toLowerCase(),outcome=name.includes('timeout')?'timeout':'provider_error';
+      console.warn('Optional local AI assistant unavailable; deterministic fallback retained',{outcome});
+      return{intro:null,tags:[],model:config.model,outcome};
+    }
+  })();
+  LOCAL_AI_CACHE.set(cacheKey,task);
+  if(LOCAL_AI_CACHE.size>200)LOCAL_AI_CACHE.delete(LOCAL_AI_CACHE.keys().next().value);
+  return task;
+}
 async function analyzeTasteAssisted(work,myComment,rating,env){const fallback=analyzeTaste(work,myComment,rating),candidate=await localAiCandidate(work,env);if(!candidate?.tags?.length)return fallback;const byTag=new Map(fallback.tags.map(item=>[item.tag,item])),merged=[];for(const item of candidate.tags)merged.push({...item,score:Math.max(item.score,byTag.get(item.tag)?.score||0)});for(const item of fallback.tags)if(!merged.some(candidateTag=>candidateTag.tag===item.tag))merged.push(item);const tags=merged.slice(0,8),[a,b]=tags;return{...fallback,engine:'local-ai-assisted-v1',tags,summary:`${a.tag}을 중심으로 ${b.tag}과 맞닿는 작품`,assistant:{accepted:true,model:candidate.model,personalDataSent:false},cost:'free-local'}}
 async function localAiStatus(request,env){if(!await currentUser(request))return json({error:'로그인이 필요합니다.'},401);if(!metadataReviewer(request,env))return json({error:'검수 권한이 없습니다.'},403);const config=localAiConfig(env);return json({enabled:config.enabled,configured:config.configured,model:config.model,reason:config.reason,guardrails:{zeroCostOnly:true,meteredProvidersBlocked:true,personalDataSent:false,publicMetadataOnly:true,deterministicFallback:true,timeoutMs:8000,qualityGate:config.qualityGate},fallbackEngine:config.fallbackEngine})}
 async function persistCatalogWorks(env,items){if(!dbReady(env)||!items?.length)return 0;const unique=new Map;for(const candidate of items.slice(0,80)){if(!isPublishedBook(candidate))continue;const work=normalizeWork(candidate);if(!work.id||!work.title||unique.has(work.id))continue;const analysis=analyzeTaste(work,'',5),editorialIntro=work.editorial_intro||editorialLine(work,analysis),catalogStatus=work.source==='Taste Constellation'?'curated':'candidate';unique.set(work.id,{...work,editorial_intro:editorialIntro,catalog_status:catalogStatus,taste_analysis:analysis,taste_vector:tasteVector(analysis.tags)})}const payload=[...unique.values()];if(!payload.length)return 0;try{return Number(await supabase(env,'rpc/upsert_work_catalog',{method:'POST',body:{p_works:payload}}))||payload.length}catch(error){console.error('Work catalog indexing unavailable',error);return 0}}
