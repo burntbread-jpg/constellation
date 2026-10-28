@@ -380,6 +380,9 @@ test.before(() => {
     }
     if (url.startsWith('https://api.themoviedb.org/3/search/multi')) {
       const query = new URL(url).searchParams.get('query');
+      if (query === 'Fallback Anime') return response({results: [
+        {id: 777, media_type: 'tv', name: '대체 애니', original_name: 'Fallback Anime', first_air_date: '2024-01-01', original_language: 'ja', genre_ids: [16], poster_path: '/fallback-anime.jpg', popularity: 80}
+      ]});
       if (query === '동일 제목') return response({results: [
         {id: 10, media_type: 'movie', title: '동일 제목', original_title: 'Same Title', release_date: '1995-01-01', overview: '원작'},
         {id: 20, media_type: 'movie', title: '동일 제목', original_title: 'Same Title', release_date: '2015-01-01', overview: '리메이크'},
@@ -427,6 +430,7 @@ test.before(() => {
     }
     if (url === 'https://graphql.anilist.co') {
       const search = JSON.parse(init.body).variables.search;
+      if (search === 'Fallback Anime') return response({error: 'temporarily unavailable'}, 503);
       if (search === '건버스터') return response({data: {Page: {media: []}}});
       if (search === 'Top wo Nerae! Gunbuster') return response({data: {Page: {media: [{id: 949, title: {userPreferred: 'Gunbuster', native: 'トップをねらえ!'}, description: '우주와 성장', startDate: {year: 1988}, coverImage: {extraLarge: 'https://images.test/gunbuster.jpg'}, genres: ['Drama'], tags: [], staff: {nodes: []}}]}}});
       if (search === '기생수') return response({data: {Page: {media: [{id: 20623, title: {userPreferred: '기생수', native: '寄生獣 セイの格率'}, description: '기생 생물과 인간의 공존', startDate: {year: 2014}, coverImage: {extraLarge: 'https://images.test/parasyte-anime.jpg'}, genres: ['Action', 'Horror'], tags: [], staff: {nodes: []}}]}}});
@@ -479,6 +483,7 @@ test.beforeEach(() => {
   state.failProviders = false;
   state.localAiMode = 'valid';
   state.localAiCalls = [];
+  state.rateBuckets.clear();
 });
 
 test.after(() => {
@@ -718,6 +723,15 @@ test('anime artwork uses the original title when the Korean title is not indexed
   assert.equal(data.source, 'AniList');
 });
 
+test('anime artwork falls back from AniList to an identity-matched TMDB poster', async () => {
+  const result = await worker.fetch(new Request('https://site.test/api/artwork?title=%EB%8C%80%EC%B2%B4%20%EC%95%A0%EB%8B%88&originalTitle=Fallback%20Anime&mediaType=ANIME'), {...env, TMDB_READ_TOKEN: 'test-token'});
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.posterUrl, 'https://image.tmdb.org/t/p/original/fallback-anime.jpg');
+  assert.equal(data.source, 'TMDB');
+  assert.deepEqual(data.fallbackChain, ['AniList', 'TMDB', 'Wikipedia']);
+});
+
 test('cultural context enriches a verified work with Wikidata awards and country', async () => {
   const result = await worker.fetch(new Request('https://site.test/api/cultural-context?title=%EA%B8%B0%EC%96%B5%EC%9D%98%20%EC%B1%85&year=2020&mediaType=BOOK'), env);
   assert.equal(result.status, 200);
@@ -815,6 +829,19 @@ test('optional local AI rejects unsafe output and preserves the deterministic fa
   assert.equal(typeof data.controlText,'string');
 });
 
+test('optional local AI enforces a distributed service daily cap and falls back safely', async () => {
+  const aiEnv={...env,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-limited',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions',LOCAL_AI_DAILY_LIMIT:'2',LOCAL_AI_HOURLY_PER_USER_LIMIT:'5'};
+  let last;
+  for(let index=1;index<=3;index++)last=await worker.fetch(new Request('https://site.test/api/editorial-intro',{method:'POST',headers:{'content-type':'application/json','cf-connecting-ip':'198.51.100.20'},body:JSON.stringify({work:{id:`book:limited-${index}`,title:`제한 시험 ${index}`,creator:'작가',mediaType:'BOOK',description:'기억과 상실을 다룬 소설',tags:['기억','상실']}})}),aiEnv);
+  const data=await last.json();
+  assert.equal(last.status,200);
+  assert.equal(state.localAiCalls.length,2);
+  assert.equal(data.engine,'metadata-editorial-v2');
+  assert.equal(data.guardrails.aiOutcome,'usage_limited');
+  assert.equal(data.guardrails.usageLimit.reason,'daily_service_limit');
+  assert.equal(data.guardrails.fallback,true);
+});
+
 test('local AI can assist Taste DNA without receiving the personal review', async () => {
   const aiEnv={...env,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-taste',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions'};
   const privateReview='좋아서 저장한 개인 감상은 외부 모델에 보내면 안 됩니다';
@@ -847,7 +874,7 @@ test('cultural context rejects an ambiguous Wikidata candidate', async () => {
   assert.equal(data.source, 'Wikidata');
 });
 
-test('search combines free Open Library and AniList results without paid keys', async () => {
+test('search reports free providers but excludes provider-ranked title mismatches', async () => {
   const result = await worker.fetch(new Request('https://site.test/api/search?q=기억'), env);
   assert.equal(result.status, 200);
   const data = await result.json();
@@ -855,7 +882,9 @@ test('search combines free Open Library and AniList results without paid keys', 
   assert.equal(data.sources.AniList, 'ok');
   assert.equal(data.sources.TMDB, 'needs_key');
   assert.equal(data.sources['Google Books'], 'needs_key');
-  assert.deepEqual(data.items.map(item => item.source).sort(), ['AniList', 'Open Library']);
+  assert.deepEqual(data.items.map(item => item.source).sort(), ['Open Library']);
+  assert.equal(data.items.some(item=>item.title==='별의 아이'),false);
+  assert.equal(data.identityPolicy,'exact-title-media-v1');
 });
 
 test('book search excludes web novels, study books, and records without a published edition', async () => {

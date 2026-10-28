@@ -98,11 +98,25 @@ test('stage 73 keeps AI optional, zero-cost, private, and quality-gated', async 
   assert.match(engine,/controlText/);
   assert.match(engine,/모든 것을 잃/);
   assert.match(engine,/aiOutcome:candidate\?\.outcome\|\|'not_attempted'/);
+  assert.match(engine,/LOCAL_AI_DAILY_LIMIT/);
+  assert.match(engine,/LOCAL_AI_HOURLY_PER_USER_LIMIT/);
+  assert.match(engine,/usage_limited/);
   assert.match(await readFile(new URL('../src/client/01-core.js',import.meta.url),'utf8'),/dataset\.editorialEngine=data\.engine/);
   assert.match(archive,/analyzeTasteAssisted/);
   assert.match(router,/\/api\/ai-assist\/status/);
   assert.match(html,/OPTIONAL AI ASSIST/);
   assert.match(policy,/개인 감상문은 기존 엔진에서만 처리/);
+});
+
+test('search identity and anime artwork use strict multi-provider fallbacks', async()=>{
+  const providers=await readFile(new URL('../src/server/01-providers.js',import.meta.url),'utf8');
+  const router=await readFile(new URL('../src/server/06-router.js',import.meta.url),'utf8');
+  assert.match(providers,/searchIdentityScore/);
+  assert.match(providers,/identityPolicy:'exact-title-media-v1'/);
+  assert.match(providers,/genre_ids\.includes\(16\)/);
+  assert.match(providers,/tmdbAnimeArtwork/);
+  assert.match(providers,/fallbackChain:\['AniList','TMDB','Wikipedia'\]/);
+  assert.match(router,/resilientArtwork\(request,env\)/);
 });
 
 test('metadata quality queue supports title, media, missing-field, and priority controls', async () => {
