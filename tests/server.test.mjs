@@ -812,6 +812,7 @@ test('optional local AI rejects unsafe output and preserves the deterministic fa
   assert.equal(data.cost,'free');
   assert.equal(data.guardrails.fallback,true);
   assert.equal(data.guardrails.aiOutcome,'quality_gate_rejected');
+  assert.equal(typeof data.controlText,'string');
 });
 
 test('local AI can assist Taste DNA without receiving the personal review', async () => {
