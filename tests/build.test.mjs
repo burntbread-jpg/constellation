@@ -417,3 +417,20 @@ test('disaster recovery has private logical exports, checksum verification, and 
   assert.match(runbook,/Storage 객체/);assert.match(runbook,/쓰기를 재개하지 않고/);
   assert.match(ignore,/\.backups\//);
 });
+
+test('privacy retention is bounded, scheduled, documented, and atomically deletes user data',async()=>{
+  const migration=await readFile(new URL('../supabase/migrations/20261027132839_stage70_privacy_retention.sql',import.meta.url),'utf8');
+  const policy=await readFile(new URL('../quality/PRIVACY_RETENTION.md',import.meta.url),'utf8');
+  const privacy=await readFile(new URL('../dist/client/privacy.html',import.meta.url),'utf8');
+  const server=await readFile(new URL('../src/server/04-archive.js',import.meta.url),'utf8');
+  assert.match(migration,/function public\.delete_user_private_data\(p_user_id uuid\)/);
+  assert.match(migration,/function public\.run_data_retention/);
+  assert.match(migration,/limit v_batch for update skip locked/);
+  assert.match(migration,/180 days/);assert.match(migration,/730 days/);assert.match(migration,/1095 days/);
+  assert.match(migration,/taste-constellation-data-retention/);assert.match(migration,/40 3 \* \* \*/);
+  assert.match(migration,/revoke all on function public\.delete_user_private_data\(uuid\) from public, anon, authenticated/);
+  assert.match(migration,/grant execute on function public\.run_data_retention\(timestamptz, integer\) to service_role/);
+  assert.match(server,/rpc\/delete_user_private_data/);
+  assert.match(policy,/사용자가 삭제할 때까지/);assert.match(policy,/한 테이블당 최대 5,000행/);
+  assert.match(privacy,/보존 정책 v1/);assert.match(privacy,/추천 연결은 마지막 갱신 후 180일/);
+});

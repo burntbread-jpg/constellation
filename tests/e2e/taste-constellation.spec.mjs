@@ -168,3 +168,13 @@ test('primary screens meet WCAG A and AA without serious violations', async ({pa
   await expect(page.locator('#archiveView')).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page, '내 성좌 화면');
 });
+
+test('privacy page publishes the active retention policy on desktop and mobile',async({page})=>{
+  await page.goto('/privacy.html');
+  await expect(page.getByRole('heading',{name:'개인정보 안내'})).toBeVisible();
+  await expect(page.getByText(/보존 정책 v1/)).toBeVisible();
+  await expect(page.getByText(/추천 연결은 마지막 갱신 후 180일/)).toBeVisible();
+  await expect(page.getByText(/추천 반응은 730일/)).toBeVisible();
+  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});

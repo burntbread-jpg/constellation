@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "migrationCount": 25,
+  "migrationCount": 26,
   "migrations": [
     {
       "name": "20261005_stage15_archive_management.sql",
@@ -108,6 +108,11 @@
       "bytes": 554
     },
     {
+      "name": "20261027132839_stage70_privacy_retention.sql",
+      "sha256": "53316d077d07fa4c0068815d5ac6d93fba5c521fdfc7ba008c2ef208cddd5ae1",
+      "bytes": 8795
+    },
+    {
       "name": "20261027_stage67_performance_indexes.sql",
       "sha256": "83eb949e420b92d02f7d8ea5c16443601032a566f20c439262d4d788ddd76bd3",
       "bytes": 290
@@ -128,7 +133,7 @@
       "bytes": 1548
     }
   ],
-  "schemaSha256": "1d8249acbc060a055afdd809b487a2a3db588ed044917855d86d95979c24047b",
+  "schemaSha256": "ca4f2934210a9e318ac78579e8d23be5cd37859674267370fa18df8436349606",
   "requiredTables": [
     "profiles",
     "works",
@@ -137,13 +142,16 @@
     "connections",
     "recommendation_feedback",
     "metadata_reports",
-    "metadata_changes"
+    "metadata_changes",
+    "data_retention_runs"
   ],
   "requiredFunctions": [
     "save_archive_analysis",
     "match_work_catalog",
     "taste_similarity_edges",
-    "consume_api_rate_limit"
+    "consume_api_rate_limit",
+    "delete_user_private_data",
+    "run_data_retention"
   ],
   "archiveBackupVersion": 1,
   "passed": true,

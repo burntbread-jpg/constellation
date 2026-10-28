@@ -76,6 +76,22 @@ function mockSupabase(url, init = {}) {
     return response([{allowed:count<=limit,request_count:count,limit_value:limit,remaining:Math.max(0,limit-count),retry_after:count<=limit?0:60,reset_at:new Date(Date.now()+60000).toISOString()}]);
   }
 
+  if(method==='POST'&&table==='delete_user_private_data'){
+    const deletedUserId=body.p_user_id,counts={
+      archives:[...state.archive.values()].filter(item=>item.user_id===deletedUserId).length,
+      tasteTags:state.tags.filter(item=>item.user_id===deletedUserId).length,
+      connections:state.connections.filter(item=>item.user_id===deletedUserId).length,
+      recommendationFeedback:[...state.feedback.values()].filter(item=>item.user_id===deletedUserId).length,
+      metadataReports:state.metadataReports.filter(item=>item.user_id===deletedUserId).length
+    };
+    for(const [key,item] of state.archive)if(item.user_id===deletedUserId)state.archive.delete(key);
+    state.tags=state.tags.filter(item=>item.user_id!==deletedUserId);
+    state.connections=state.connections.filter(item=>item.user_id!==deletedUserId);
+    for(const [key,item] of state.feedback)if(item.user_id===deletedUserId)state.feedback.delete(key);
+    state.metadataReports=state.metadataReports.filter(item=>item.user_id!==deletedUserId);
+    return response({deleted:true,profile:1,...counts});
+  }
+
   if(method==='POST'&&table==='health_check_runs'){
     const row={...body,id:state.healthChecks.length+1};state.healthChecks.unshift(row);return response([row]);
   }
@@ -1088,6 +1104,7 @@ test('account data deletion removes only the signed-in user personal data', asyn
   state.connections.push({user_id: userId, from_work_id: 'mine'}, {user_id: otherUserId, from_work_id: 'theirs'});
   state.feedback.set(`${userId}:mine:target:deep`, {user_id: userId});
   state.feedback.set(`${otherUserId}:theirs:target:deep`, {user_id: otherUserId});
+  state.metadataReports.push({id:901,user_id:userId,status:'pending'},{id:902,user_id:otherUserId,status:'pending'});
 
   const wrongConfirmation = await worker.fetch(new Request('https://site.test/api/account-data', {
     method: 'DELETE', headers: {...headers, 'content-type': 'application/json'},
@@ -1101,11 +1118,15 @@ test('account data deletion removes only the signed-in user personal data', asyn
     body: JSON.stringify({confirmation: 'DELETE'})
   }), env);
   assert.equal(result.status, 200);
-  assert.equal((await result.json()).deleted, true);
+  const deleted=await result.json();
+  assert.equal(deleted.deleted, true);
+  assert.equal(deleted.scope.includes('metadata-reports'),true);
+  assert.equal(deleted.counts.metadataReports,1);
   assert.equal([...state.archive.values()].every(item => item.user_id === otherUserId), true);
   assert.equal(state.tags.every(item => item.user_id === otherUserId), true);
   assert.equal(state.connections.every(item => item.user_id === otherUserId), true);
   assert.equal([...state.feedback.values()].every(item => item.user_id === otherUserId), true);
+  assert.equal(state.metadataReports.every(item=>item.user_id===otherUserId),true);
   assert.equal(state.works.has('shared:work'), true);
 });
 

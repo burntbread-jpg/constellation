@@ -15,7 +15,7 @@ const outputFlag=process.argv.indexOf('--output'),outputDir=resolve(outputFlag>=
 const tables=[
   'profiles','works','archive_items','taste_tags','connections','recommendation_feedback',
   'metadata_reports','metadata_changes','duplicate_work_merges','work_identity_exceptions',
-  'health_check_runs','health_alert_events','health_alert_actions'
+  'health_check_runs','health_alert_events','health_alert_actions','data_retention_runs'
 ];
 const stable=value=>JSON.stringify(value,Object.keys(value||{}).sort());
 const digest=value=>createHash('sha256').update(typeof value==='string'?value:JSON.stringify(value)).digest('hex');
