@@ -31,6 +31,7 @@ const state = {
   healthAlertActions: [],
   webhookCalls: [],
   rateBuckets: new Map(),
+  recommendationMetrics: [],
   catalogQueries: [],
   profileWrites: 0,
   backfillCalls: 0,
@@ -75,6 +76,11 @@ function mockSupabase(url, init = {}) {
     state.rateBuckets.set(key,count);
     return response([{allowed:count<=limit,request_count:count,limit_value:limit,remaining:Math.max(0,limit-count),retry_after:count<=limit?0:60,reset_at:new Date(Date.now()+60000).toISOString()}]);
   }
+  if(method==='POST'&&table==='record_recommendation_metrics'){
+    for(const event of body.p_events||[]){const key=[event.mode,event.source_media_type,event.target_media_type,event.event_type].join('|'),row=state.recommendationMetrics.find(item=>item.key===key);if(row)row.event_count+=Number(event.count)||1;else state.recommendationMetrics.push({key,metric_date:'2026-10-28',connection_mode:event.mode,source_media_type:event.source_media_type,target_media_type:event.target_media_type,event_type:event.event_type,event_count:Number(event.count)||1})}
+    return response((body.p_events||[]).length);
+  }
+  if(method==='GET'&&table==='recommendation_metrics_daily')return response(state.recommendationMetrics);
 
   if(method==='POST'&&table==='delete_user_private_data'){
     const deletedUserId=body.p_user_id,counts={
@@ -340,8 +346,9 @@ function mockSupabase(url, init = {}) {
   if (method === 'GET' && table === 'recommendation_feedback') {
     const value = key => parsed.searchParams.get(key)?.replace(/^eq\./, '');
     const fromWorkId = value('from_work_id');
+    const toWorkId = value('to_work_id');
     const connectionMode = value('connection_mode');
-    return response([...state.feedback.values()].filter(row => row.user_id === value('user_id') && (!fromWorkId || row.from_work_id === fromWorkId) && (!connectionMode || row.connection_mode === connectionMode)));
+    return response([...state.feedback.values()].filter(row => row.user_id === value('user_id') && (!fromWorkId || row.from_work_id === fromWorkId) && (!toWorkId || row.to_work_id === toWorkId) && (!connectionMode || row.connection_mode === connectionMode)));
   }
   if (method === 'GET' && table === 'works') {
     const id = parsed.searchParams.get('id')?.replace(/^eq\./, '');
@@ -1521,6 +1528,26 @@ test('malformed client analysis cannot break the public recommendation fallback'
   assert.equal(result.status, 200);
   const data = await result.json();
   assert.equal(data.items.length, 3);
+});
+
+test('recommendation learning metrics are anonymous, deduplicated, and reviewer-only',async()=>{
+  state.recommendationMetrics=[];state.failProviders=true;
+  const sourceWork={id:'metric:source',title:'지표 출발 작품',creator:'감독',year:2020,mediaType:'FILM',description:'추천 지표 검증을 위한 충분한 길이의 작품 설명입니다.'};
+  const recommendation=await worker.fetch(new Request('https://site.test/api/recommendations',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({work:sourceWork,mode:'deep'})}),env),recommendationData=await recommendation.json();
+  assert.equal(recommendation.status,200);assert.equal(recommendationData.items.length,3);
+  assert.ok(recommendationData.items.every(item=>item.fromMediaType==='FILM'));
+  assert.equal(state.recommendationMetrics.filter(row=>row.event_type==='impression').reduce((sum,row)=>sum+row.event_count,0),3);
+  const target=recommendationData.items[0],feedbackBody={fromWorkId:sourceWork.id,toWorkId:target.id,mode:'deep',value:1,sharedTags:[],sourceMediaType:'FILM',targetMediaType:target.mediaType};
+  for(let i=0;i<2;i++){const result=await worker.fetch(new Request('https://site.test/api/recommendation-feedback',{method:'POST',headers:{...headers,'content-type':'application/json'},body:JSON.stringify(feedbackBody)}),env);assert.equal(result.status,200)}
+  assert.equal(state.recommendationMetrics.filter(row=>row.event_type==='like').reduce((sum,row)=>sum+row.event_count,0),1);
+  const savedWork={id:'metric:saved-book',title:'지표 저장 작품',creator:'작가',year:2021,mediaType:'BOOK',posterUrl:'https://image.example/book.jpg',description:'추천에서 성좌 저장으로 이어지는 흐름을 검증하기 위한 작품 설명입니다.',editorialIntro:'추천이 실제 저장으로 이어지는지 확인하는 작품.'},archiveBody={work:savedWork,rating:5,myComment:'좋아요',recommendationContext:{fromWorkId:sourceWork.id,mode:'deep',sourceMediaType:'FILM'}};
+  for(let i=0;i<2;i++){const result=await worker.fetch(new Request('https://site.test/api/archive',{method:'POST',headers:{...headers,'content-type':'application/json'},body:JSON.stringify(archiveBody)}),env);assert.equal(result.status,201)}
+  assert.equal(state.recommendationMetrics.filter(row=>row.event_type==='save').reduce((sum,row)=>sum+row.event_count,0),1);
+  const denied=await worker.fetch(new Request('https://site.test/api/recommendation-metrics',{headers}),env);assert.equal(denied.status,403);
+  const reviewerId='77777777-7777-4777-8777-777777777777',reviewerEnv={...env,METADATA_REVIEWER_IDS:reviewerId},dashboard=await worker.fetch(new Request('https://site.test/api/recommendation-metrics?days=30',{headers:{'oai-authenticated-user-id':reviewerId}}),reviewerEnv),data=await dashboard.json();
+  assert.equal(dashboard.status,200);assert.equal(data.totals.impressions,3);assert.equal(data.totals.likes,1);assert.equal(data.totals.saves,1);
+  assert.deepEqual(data.privacy,{userIdentifiers:false,workIdentifiers:false,freeText:false,retentionDays:730,aggregation:'daily'});
+  assert.equal(JSON.stringify(state.recommendationMetrics).includes(userId),false);assert.equal(JSON.stringify(state.recommendationMetrics).includes(target.id),false);
 });
 
 test('authenticated recommendations fall back when profile persistence fails', async () => {

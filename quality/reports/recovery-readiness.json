@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "migrationCount": 28,
+  "migrationCount": 29,
   "migrations": [
     {
       "name": "20261005_stage15_archive_management.sql",
@@ -141,9 +141,14 @@
       "name": "20261028073127_stage71_catalog_quality_backfill.sql",
       "sha256": "fd543ce10033650fe6defab19ba9a4fb75fd37152792c892258e5fe190ec0539",
       "bytes": 539
+    },
+    {
+      "name": "20261028075520_stage72_recommendation_learning_metrics.sql",
+      "sha256": "c7dcc5a82a512cb86e66ccefa317ef356b23c010db734f82deb8a81cc01298be",
+      "bytes": 4920
     }
   ],
-  "schemaSha256": "71d5a267711faf311c1d24d39028c9bd241d51c16fe227fd3e76f036b5916021",
+  "schemaSha256": "871346792d5eacf1f77a53682866ed5fa652004de9a83a62cf31fbfa9de0efa8",
   "requiredTables": [
     "profiles",
     "works",
@@ -151,6 +156,7 @@
     "taste_tags",
     "connections",
     "recommendation_feedback",
+    "recommendation_metrics_daily",
     "metadata_reports",
     "metadata_changes",
     "data_retention_runs"
@@ -159,6 +165,8 @@
     "save_archive_analysis",
     "match_work_catalog",
     "catalog_metadata_quality",
+    "record_recommendation_metrics",
+    "prune_recommendation_metrics",
     "taste_similarity_edges",
     "consume_api_rate_limit",
     "delete_user_private_data",

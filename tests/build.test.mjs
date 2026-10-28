@@ -447,3 +447,17 @@ test('stage 71 catalog quality gate quarantines weak candidates and serves verif
   assert.match(recommendations,/fallback:manga:parasite/);
   assert.match(recommendations,/fallback:manga:fullmetal-alchemist/);
 });
+
+test('stage 72 recommendation metrics are aggregate-only, private, retained, and visible to reviewers',async()=>{
+  const migration=await readFile(new URL('../supabase/migrations/20261028075520_stage72_recommendation_learning_metrics.sql',import.meta.url),'utf8');
+  const policy=await readFile(new URL('../quality/RECOMMENDATION_METRICS.md',import.meta.url),'utf8');
+  const client=await readFile(new URL('../dist/client/index.html',import.meta.url),'utf8');
+  assert.match(migration,/create table if not exists public\.recommendation_metrics_daily/);
+  assert.match(migration,/primary key \(metric_date, connection_mode, source_media_type, target_media_type, event_type\)/);
+  assert.doesNotMatch(migration,/recommendation_metrics_daily[\s\S]{0,800}user_id/);
+  assert.doesNotMatch(migration,/recommendation_metrics_daily[\s\S]{0,800}work_id/);
+  assert.match(migration,/enable row level security/);assert.match(migration,/to anon, authenticated using \(false\)/);
+  assert.match(migration,/revoke all on function public\.record_recommendation_metrics\(jsonb\) from public, anon, authenticated/);
+  assert.match(migration,/current_date - 730/);assert.match(migration,/taste-constellation-recommendation-metrics-retention/);
+  assert.match(policy,/사용자 ID, 작품 ID, 이메일, IP/);assert.match(client,/recommendationMetricsSummary/);
+});

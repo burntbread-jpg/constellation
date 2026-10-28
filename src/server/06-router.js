@@ -256,6 +256,7 @@ async function routeApi(request,env,url){
   if(pathname==='/api/metadata-reports')return request.method==='POST'?metadataReport(request,env):request.method==='GET'?metadataReportQueue(request,env):methodNotAllowed(['GET','POST']);
   if(pathname==='/api/my-metadata-reports')return request.method==='GET'?myMetadataReports(request,env):methodNotAllowed(['GET']);
   if(pathname==='/api/metadata-quality')return request.method==='GET'?metadataQualityDashboard(request,env):methodNotAllowed(['GET']);
+  if(pathname==='/api/recommendation-metrics')return request.method==='GET'?recommendationMetricsDashboard(request,env):methodNotAllowed(['GET']);
   if(pathname==='/api/duplicate-candidates')return request.method==='GET'?duplicateWorkCandidates(request,env):methodNotAllowed(['GET']);
   if(pathname==='/api/duplicate-preview')return request.method==='GET'?duplicateMergePreviewGuarded(request,env):methodNotAllowed(['GET']);
   if(pathname==='/api/duplicate-merge')return request.method==='POST'?mergeDuplicateWorksGuarded(request,env):methodNotAllowed(['POST']);
@@ -267,11 +268,11 @@ async function routeApi(request,env,url){
   if(pathname.startsWith('/api/metadata-reports/')){const id=pathname.slice('/api/metadata-reports/'.length);return request.method==='PATCH'?reviewMetadataReport(request,env,id):methodNotAllowed(['PATCH'])}
   if(pathname==='/api/metadata-changes')return request.method==='GET'?metadataChangeHistory(request,env):methodNotAllowed(['GET']);
   if(pathname.startsWith('/api/metadata-changes/')){const id=pathname.slice('/api/metadata-changes/'.length);return request.method==='PATCH'?rollbackMetadataChange(request,env,id):methodNotAllowed(['PATCH'])}
-  if(pathname==='/api/recommendations')return request.method==='POST'?recommendationsV5(request,env):methodNotAllowed(['POST']);
-  if(pathname==='/api/recommendation-feedback')return request.method==='POST'?recommendationFeedbackV2(request,env):methodNotAllowed(['POST']);
+  if(pathname==='/api/recommendations')return request.method==='POST'?trackedRecommendations(request,env):methodNotAllowed(['POST']);
+  if(pathname==='/api/recommendation-feedback')return request.method==='POST'?trackedRecommendationFeedback(request,env):methodNotAllowed(['POST']);
   if(pathname==='/api/connections')return request.method==='GET'?connections(request,env):methodNotAllowed(['GET']);
   if(pathname==='/api/constellation')return request.method==='GET'?constellationMap(request,env):methodNotAllowed(['GET']);
-  if(pathname==='/api/archive')return ['GET','POST'].includes(request.method)?archive(request,env):methodNotAllowed(['GET','POST']);
+  if(pathname==='/api/archive')return ['GET','POST'].includes(request.method)?trackedArchive(request,env):methodNotAllowed(['GET','POST']);
   if(pathname==='/api/account-data')return request.method==='DELETE'?removeAccountData(request,env):methodNotAllowed(['DELETE']);
   if(pathname==='/api/taste-profile')return request.method==='GET'?tasteProfileV2(request,env):methodNotAllowed(['GET']);
   if(pathname==='/api/taste-similarities')return request.method==='GET'?tasteSimilarities(request,env):methodNotAllowed(['GET']);
