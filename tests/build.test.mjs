@@ -434,3 +434,16 @@ test('privacy retention is bounded, scheduled, documented, and atomically delete
   assert.match(policy,/사용자가 삭제할 때까지/);assert.match(policy,/한 테이블당 최대 5,000행/);
   assert.match(privacy,/보존 정책 v1/);assert.match(privacy,/추천 연결은 마지막 갱신 후 180일/);
 });
+
+test('stage 71 catalog quality gate quarantines weak candidates and serves verified metadata only',async()=>{
+  const migration=await readFile(new URL('../supabase/migrations/20261028071619_stage71_catalog_quality.sql',import.meta.url),'utf8');
+  const recommendations=await readFile(new URL('../src/server/05-recommendations.js',import.meta.url),'utf8');
+  assert.match(migration,/catalog_status/);assert.match(migration,/metadata_quality_score/);
+  assert.match(migration,/works_catalog_ready_idx/);assert.match(migration,/catalog_metadata_quality/);
+  assert.match(migration,/catalog_status in \('curated','verified'\)/);
+  assert.match(migration,/create function public\.match_work_catalog/);
+  assert.match(recommendations,/curated-metadata-cross-media-v2/);
+  assert.match(recommendations,/recommendationReady/);
+  assert.match(recommendations,/fallback:manga:parasite/);
+  assert.match(recommendations,/fallback:manga:fullmetal-alchemist/);
+});

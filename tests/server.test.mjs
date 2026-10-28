@@ -963,7 +963,7 @@ test('public metadata provenance exposes only the latest applied source per fiel
 
 test('metadata quality dashboard ranks incomplete works for reviewers only', async () => {
   const reviewerId='44444444-4444-4444-8444-444444444444',reviewerHeaders={'oai-authenticated-user-id':reviewerId,'oai-authenticated-user-email':'reviewer@example.com'},reviewerEnv={...env,METADATA_REVIEWER_IDS:reviewerId};
-  state.works.set('film:quality-complete',{id:'film:quality-complete',title:'완성 작품',creator:'감독',release_year:2020,media_type:'FILM',poster_url:'https://image.example/poster.jpg',description:'충분한 길이의 작품 소개 문장입니다.',source:'TMDB'});
+  state.works.set('film:quality-complete',{id:'film:quality-complete',title:'완성 작품',creator:'감독',release_year:2020,media_type:'FILM',poster_url:'https://image.example/poster.jpg',description:'충분한 길이로 작품의 배경과 중심 갈등을 정확하게 설명하는 소개 문장입니다.',editorial_intro:'한 문장으로 작품의 갈등을 선명하게 소개하는 작품.',source:'TMDB',canonical_key:'film:complete:2020',catalog_status:'verified',metadata_quality_score:100,metadata_verified_at:'2026-10-28T00:00:00.000Z'});
   state.works.set('book:quality-missing',{id:'book:quality-missing',title:'보완 작품',creator:'작자 미상',release_year:null,media_type:'OTHER',poster_url:null,description:'',source:'Taste Constellation'});
   const denied=await worker.fetch(new Request('https://site.test/api/metadata-quality',{headers}),reviewerEnv);
   assert.equal(denied.status,403);
@@ -971,8 +971,8 @@ test('metadata quality dashboard ranks incomplete works for reviewers only', asy
   assert.equal(result.status,200);
   assert.ok(data.total>=2);
   const incomplete=data.items.find(item=>item.work.id==='book:quality-missing');
-  assert.deepEqual(incomplete.missing,['year','creator','poster','intro','media_type','source']);
-  assert.equal(incomplete.score,0);
+  assert.deepEqual(incomplete.missing,['year','creator','poster','description','intro','media_type','canonical_key']);
+  assert.equal(incomplete.score,22);
   assert.equal(data.items.some(item=>item.work.id==='film:quality-complete'),false);
 });
 
@@ -1504,6 +1504,7 @@ test('all connection modes satisfy the release quality gate', async () => {
     assert.equal(new Set(data.items.map(item => item.id)).size, data.items.length);
     assert.ok(new Set(data.items.map(item => item.mediaType)).size >= 2);
     assert.ok(data.items.every(item => Number.isInteger(item.year) && item.year >= 1800));
+    assert.ok(data.items.every(item => item.creator && item.posterUrl));
     assert.ok(data.items.every(item => item.editorialIntro?.endsWith('작품.')));
     assert.ok(data.items.every(item => !item.editorialIntro.includes(`${work.title}에서`)));
     signatures.add(data.items.map(item => item.id).join('|'));

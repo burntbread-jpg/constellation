@@ -19,27 +19,27 @@
     "scenarioPassRate": 1,
     "tagAlignment": 0.9311,
     "crossMediaRate": 1,
-    "modeDifferentiation": 0.9067,
+    "modeDifferentiation": 0.92,
     "editorialQuality": 1,
-    "perCaseUniqueRate": 0.4289
+    "perCaseUniqueRate": 0.4689
   },
   "perMode": {
     "story": {
       "scenarios": 30,
       "passRate": 1,
-      "tagAlignment": 0.8889,
+      "tagAlignment": 0.8667,
       "crossMediaRate": 1
     },
     "mood": {
       "scenarios": 30,
       "passRate": 1,
-      "tagAlignment": 0.8778,
+      "tagAlignment": 0.8889,
       "crossMediaRate": 1
     },
     "idea": {
       "scenarios": 30,
       "passRate": 1,
-      "tagAlignment": 0.9778,
+      "tagAlignment": 0.9667,
       "crossMediaRate": 1
     },
     "visual": {
@@ -51,7 +51,7 @@
     "deep": {
       "scenarios": 30,
       "passRate": 1,
-      "tagAlignment": 0.9556,
+      "tagAlignment": 0.9778,
       "crossMediaRate": 1
     }
   },
@@ -77,7 +77,7 @@
       "id": "eval:film:persona",
       "title": "퍼소나",
       "modeDifferentiation": 1,
-      "uniqueRate": 0.4667
+      "uniqueRate": 0.5333
     },
     {
       "id": "eval:book:norwegian-wood",
@@ -95,13 +95,13 @@
       "id": "eval:film:her",
       "title": "Her",
       "modeDifferentiation": 1,
-      "uniqueRate": 0.2667
+      "uniqueRate": 0.3333
     },
     {
       "id": "eval:anime:lain",
       "title": "Serial Experiments Lain",
-      "modeDifferentiation": 0.8,
-      "uniqueRate": 0.4667
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.5333
     },
     {
       "id": "eval:book:klara",
@@ -119,31 +119,31 @@
       "id": "eval:anime:ghost-shell",
       "title": "공각기동대",
       "modeDifferentiation": 0.6,
-      "uniqueRate": 0.4
+      "uniqueRate": 0.4667
     },
     {
       "id": "eval:book:no-longer-human",
       "title": "인간 실격",
-      "modeDifferentiation": 0.8,
-      "uniqueRate": 0.4
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.4667
     },
     {
       "id": "eval:film:melancholia",
       "title": "멜랑콜리아",
       "modeDifferentiation": 1,
-      "uniqueRate": 0.3333
+      "uniqueRate": 0.4667
     },
     {
       "id": "eval:anime:angels-egg",
       "title": "천사의 알",
       "modeDifferentiation": 1,
-      "uniqueRate": 0.5333
+      "uniqueRate": 0.6
     },
     {
       "id": "eval:book:childhoods-end",
       "title": "유년기의 끝",
       "modeDifferentiation": 1,
-      "uniqueRate": 0.6
+      "uniqueRate": 0.6667
     },
     {
       "id": "eval:film:eternal-sunshine",
@@ -154,20 +154,20 @@
     {
       "id": "eval:anime:gunbuster",
       "title": "건버스터",
-      "modeDifferentiation": 0.8,
-      "uniqueRate": 0.4
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.4667
     },
     {
       "id": "eval:book:left-hand-darkness",
       "title": "어둠의 왼손",
-      "modeDifferentiation": 0.8,
-      "uniqueRate": 0.3333
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.4
     },
     {
       "id": "eval:film:2001",
       "title": "2001 스페이스 오디세이",
-      "modeDifferentiation": 1,
-      "uniqueRate": 0.4
+      "modeDifferentiation": 0.8,
+      "uniqueRate": 0.4667
     },
     {
       "id": "eval:book:never-let-me-go",
@@ -203,19 +203,19 @@
       "id": "eval:manga:parasyte",
       "title": "기생수",
       "modeDifferentiation": 1,
-      "uniqueRate": 0.6
+      "uniqueRate": 0.6667
     },
     {
       "id": "eval:anime:fullmetal",
       "title": "강철의 연금술사",
-      "modeDifferentiation": 0.6,
-      "uniqueRate": 0.2
+      "modeDifferentiation": 0.4,
+      "uniqueRate": 0.2667
     },
     {
       "id": "eval:book:midnights-children",
       "title": "한밤의 아이들",
-      "modeDifferentiation": 0.8,
-      "uniqueRate": 0.3333
+      "modeDifferentiation": 0.6,
+      "uniqueRate": 0.2667
     },
     {
       "id": "eval:film:stalker",
@@ -226,14 +226,14 @@
     {
       "id": "eval:anime:mononoke",
       "title": "모노노케 히메",
-      "modeDifferentiation": 0.8,
-      "uniqueRate": 0.4
+      "modeDifferentiation": 1,
+      "uniqueRate": 0.5333
     },
     {
       "id": "eval:book:frankenstein",
       "title": "프랑켄슈타인",
       "modeDifferentiation": 1,
-      "uniqueRate": 0.4667
+      "uniqueRate": 0.6
     },
     {
       "id": "eval:film:children-men",
@@ -245,7 +245,7 @@
       "id": "eval:anime:paprika",
       "title": "파프리카",
       "modeDifferentiation": 1,
-      "uniqueRate": 0.4
+      "uniqueRate": 0.4667
     }
   ]
 }

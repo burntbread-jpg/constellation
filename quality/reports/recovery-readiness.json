@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "migrationCount": 26,
+  "migrationCount": 28,
   "migrations": [
     {
       "name": "20261005_stage15_archive_management.sql",
@@ -131,9 +131,19 @@
       "name": "20261027_stage72_korean_book_covers.sql",
       "sha256": "bf4b7e8dfab6a8b0433d09004b15d2f72e01c845cd6342d80df5de92ed391eef",
       "bytes": 1548
+    },
+    {
+      "name": "20261028071619_stage71_catalog_quality.sql",
+      "sha256": "2d579784fa15767e20c6d6c0a991e826bf63b3a5eaa9b460e25bf2c648ff7fdb",
+      "bytes": 13658
+    },
+    {
+      "name": "20261028073127_stage71_catalog_quality_backfill.sql",
+      "sha256": "fd543ce10033650fe6defab19ba9a4fb75fd37152792c892258e5fe190ec0539",
+      "bytes": 539
     }
   ],
-  "schemaSha256": "ca4f2934210a9e318ac78579e8d23be5cd37859674267370fa18df8436349606",
+  "schemaSha256": "71d5a267711faf311c1d24d39028c9bd241d51c16fe227fd3e76f036b5916021",
   "requiredTables": [
     "profiles",
     "works",
@@ -148,6 +158,7 @@
   "requiredFunctions": [
     "save_archive_analysis",
     "match_work_catalog",
+    "catalog_metadata_quality",
     "taste_similarity_edges",
     "consume_api_rate_limit",
     "delete_user_private_data",
