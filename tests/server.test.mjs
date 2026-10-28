@@ -796,6 +796,7 @@ test('optional local AI accepts only zero-cost quality-gated public metadata', a
   assert.equal(data.engine,'local-ai-editorial-v1');
   assert.equal(data.cost,'free-local');
   assert.equal(data.guardrails.personalDataSent,false);
+  assert.equal(data.guardrails.aiOutcome,'accepted');
   assert.match(data.text,/작품\.$/);
   assert.equal(state.localAiCalls.length,1);
   const sent=JSON.stringify(state.localAiCalls[0]);
@@ -810,6 +811,7 @@ test('optional local AI rejects unsafe output and preserves the deterministic fa
   assert.equal(data.engine,'metadata-editorial-v2');
   assert.equal(data.cost,'free');
   assert.equal(data.guardrails.fallback,true);
+  assert.equal(data.guardrails.aiOutcome,'quality_gate_rejected');
 });
 
 test('local AI can assist Taste DNA without receiving the personal review', async () => {

@@ -93,6 +93,8 @@ test('stage 73 keeps AI optional, zero-cost, private, and quality-gated', async 
   assert.match(engine,/replace\(\/<think>/);
   assert.match(engine,/validateLocalAiIntro/);
   assert.match(engine,/validateLocalAiTags/);
+  assert.match(engine,/aiOutcome:candidate\?\.outcome\|\|'not_attempted'/);
+  assert.match(await readFile(new URL('../src/client/01-core.js',import.meta.url),'utf8'),/dataset\.editorialEngine=data\.engine/);
   assert.match(archive,/analyzeTasteAssisted/);
   assert.match(router,/\/api\/ai-assist\/status/);
   assert.match(html,/OPTIONAL AI ASSIST/);
