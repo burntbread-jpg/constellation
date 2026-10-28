@@ -90,7 +90,7 @@ test('stage 73 keeps AI optional, zero-cost, private, and quality-gated', async 
   assert.match(engine,/LOCAL_AI_BLOCKED_HOSTS/);
   assert.match(engine,/personalDataSent:false/);
   assert.match(engine,/AbortSignal\.timeout\(8000\)/);
-  assert.match(engine,/response_format:\{type:'json_object'\}/);
+  assert.match(engine,/replace\(\/<think>/);
   assert.match(engine,/validateLocalAiIntro/);
   assert.match(engine,/validateLocalAiTags/);
   assert.match(archive,/analyzeTasteAssisted/);
