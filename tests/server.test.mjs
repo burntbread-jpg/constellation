@@ -37,7 +37,9 @@ const state = {
   backfillCalls: 0,
   failProfiles: false,
   failHealth: false,
-  failProviders: false
+  failProviders: false,
+  localAiMode: 'valid',
+  localAiCalls: []
 };
 
 function response(data, status = 200) {
@@ -361,6 +363,14 @@ test.before(() => {
   globalThis.fetch = async (input, init) => {
     const url = String(input);
     if (url.startsWith(env.SUPABASE_URL)) return mockSupabase(url, init);
+    if (url === 'https://local-ai.test/v1/chat/completions') {
+      const payload=JSON.parse(init.body);state.localAiCalls.push(payload);
+      if(state.localAiMode==='error')return response({error:'unavailable'},503);
+      const content=state.localAiMode==='invalid'
+        ? JSON.stringify({intro:'생각하게 하는 작품.',tags:['허용되지 않은 태그']})
+        : JSON.stringify({intro:'닫힌 방의 창문 하나로 기억과 상실의 거리를 재어 보는 작품.',tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'공간과 경계',score:.76}]});
+      return response({choices:[{message:{content}}]});
+    }
     if (url === 'https://alerts.test/health') {state.webhookCalls.push(JSON.parse(init.body));return response({ok:true});}
     if (state.failProviders) throw new Error(`Provider unavailable: ${url}`);
     if (url.startsWith('https://api.themoviedb.org/3/search/movie')) {
@@ -467,6 +477,8 @@ test.beforeEach(() => {
   state.failProfiles = false;
   state.failHealth = false;
   state.failProviders = false;
+  state.localAiMode = 'valid';
+  state.localAiCalls = [];
 });
 
 test.after(() => {
@@ -775,6 +787,53 @@ test('curated editorial hooks never leak into a same-title different medium', as
   const data = await result.json();
   assert.notEqual(data.text, '스타의 얼굴을 여러 거울에 깨뜨려 진짜 내가 어느 조각인지 묻는 작품.');
   assert.equal(data.engine, 'metadata-editorial-v2');
+});
+
+test('optional local AI accepts only zero-cost quality-gated public metadata', async () => {
+  const aiEnv={...env,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-test',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions'};
+  const result=await worker.fetch(new Request('https://site.test/api/editorial-intro',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({work:{id:'book:ai-quality',title:'기억의 방',creator:'작가',mediaType:'BOOK',description:'닫힌 방에서 잃어버린 가족의 기억을 복원하는 소설',tags:['기억','상실']}})}),aiEnv),data=await result.json();
+  assert.equal(result.status,200);
+  assert.equal(data.engine,'local-ai-editorial-v1');
+  assert.equal(data.cost,'free-local');
+  assert.equal(data.guardrails.personalDataSent,false);
+  assert.match(data.text,/작품\.$/);
+  assert.equal(state.localAiCalls.length,1);
+  const sent=JSON.stringify(state.localAiCalls[0]);
+  assert.doesNotMatch(sent,/reader@example\.com|좋아서 저장한 개인 감상/);
+});
+
+test('optional local AI rejects unsafe output and preserves the deterministic fallback', async () => {
+  state.localAiMode='invalid';
+  const aiEnv={...env,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-invalid',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions'};
+  const result=await worker.fetch(new Request('https://site.test/api/editorial-intro',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({work:{id:'book:ai-invalid',title:'낯선 기억',creator:'작가',mediaType:'BOOK',description:'기억과 상실을 다룬 소설',tags:['기억','상실']}})}),aiEnv),data=await result.json();
+  assert.equal(result.status,200);
+  assert.equal(data.engine,'metadata-editorial-v2');
+  assert.equal(data.cost,'free');
+  assert.equal(data.guardrails.fallback,true);
+});
+
+test('local AI can assist Taste DNA without receiving the personal review', async () => {
+  const aiEnv={...env,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-taste',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions'};
+  const privateReview='좋아서 저장한 개인 감상은 외부 모델에 보내면 안 됩니다';
+  const result=await worker.fetch(new Request('https://site.test/api/archive',{method:'POST',headers:{...headers,'content-type':'application/json'},body:JSON.stringify({work:{id:'book:ai-taste',title:'기억의 집',creator:'작가',mediaType:'BOOK',description:'집과 기억과 상실을 다룬 소설',tags:['기억','상실']},rating:5,myComment:privateReview})}),aiEnv),data=await result.json();
+  assert.equal(result.status,201);
+  assert.equal(data.work.analysis.engine,'local-ai-assisted-v1');
+  assert.equal(data.work.analysis.assistant.personalDataSent,false);
+  assert.equal(state.localAiCalls.length,1);
+  assert.doesNotMatch(JSON.stringify(state.localAiCalls[0]),new RegExp(privateReview));
+  assert.equal(data.work.myComment,privateReview);
+});
+
+test('optional AI status is reviewer-only and blocks metered providers', async () => {
+  const reviewerId='73737373-7373-4373-8373-737373737373',headers={'oai-authenticated-user-id':reviewerId},reviewerEnv={...env,METADATA_REVIEWER_IDS:reviewerId,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'paid-model',LOCAL_AI_CHAT_ENDPOINT:'https://api.openai.com/v1/chat/completions'};
+  const anonymous=await worker.fetch(new Request('https://site.test/api/ai-assist/status'),reviewerEnv);
+  assert.equal(anonymous.status,401);
+  const result=await worker.fetch(new Request('https://site.test/api/ai-assist/status',{headers}),reviewerEnv),data=await result.json();
+  assert.equal(result.status,200);
+  assert.equal(data.enabled,false);
+  assert.equal(data.reason,'metered_provider_blocked');
+  assert.equal(data.guardrails.personalDataSent,false);
+  assert.equal(data.guardrails.deterministicFallback,true);
 });
 
 test('cultural context rejects an ambiguous Wikidata candidate', async () => {

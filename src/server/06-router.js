@@ -252,7 +252,8 @@ async function routeApi(request,env,url){
   if(pathname==='/api/artwork')return request.method==='GET'?publicMetadata(await artwork(request,env),86400):methodNotAllowed(['GET']);
   if(pathname==='/api/cultural-context')return request.method==='GET'?publicMetadata(await culturalContext(request),86400):methodNotAllowed(['GET']);
   if(pathname==='/api/book-publishers')return request.method==='GET'?publicMetadata(await bookPublishers(request,env),21600):methodNotAllowed(['GET']);
-  if(pathname==='/api/editorial-intro')return request.method==='POST'?editorialIntro(request):methodNotAllowed(['POST']);
+  if(pathname==='/api/editorial-intro')return request.method==='POST'?editorialIntro(request,env):methodNotAllowed(['POST']);
+  if(pathname==='/api/ai-assist/status')return request.method==='GET'?localAiStatus(request,env):methodNotAllowed(['GET']);
   if(pathname==='/api/metadata-reports')return request.method==='POST'?metadataReport(request,env):request.method==='GET'?metadataReportQueue(request,env):methodNotAllowed(['GET','POST']);
   if(pathname==='/api/my-metadata-reports')return request.method==='GET'?myMetadataReports(request,env):methodNotAllowed(['GET']);
   if(pathname==='/api/metadata-quality')return request.method==='GET'?metadataQualityDashboard(request,env):methodNotAllowed(['GET']);
@@ -294,7 +295,7 @@ async function routeApi(request,env,url){
       sources:{
         tmdb:!!env.TMDB_READ_TOKEN,googleBooks:!!env.GOOGLE_BOOKS_API_KEY,openLibrary:true,aniList:true,wikidata:true,
         supabase:dbReady(env),culturalContext:'wikidata-authority-catalog-v2',publisherEngine:'korean-editions-v1',
-        editorialEngine:'curated-metadata-editorial-v2',artworkEngine:'official-artwork-ranking-v2',
+        editorialEngine:'curated-metadata-editorial-v2',aiAssist:localAiConfig(env).enabled?'local-zero-cost':'deterministic-fallback',artworkEngine:'official-artwork-ranking-v2',
         awardCatalog:{literature:10,film:12,animation:7},tasteEngine:'taste-profile-feedback-v2',
         similarityEngine:'pgvector-cosine-v1',recommendationEngine:'pgvector-catalog-feedback-v1',
         archiveEngine:'archive-management-v1',catalogDimensions:LEXICON.length

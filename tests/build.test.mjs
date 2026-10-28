@@ -80,6 +80,24 @@ test('work details diagnose incomplete metadata and link each gap to a correctio
   assert.match(events, /openMetadataReport\(button\.dataset\.metadataMissing\)/);
 });
 
+test('stage 73 keeps AI optional, zero-cost, private, and quality-gated', async () => {
+  const engine=await readFile(new URL('../src/server/03-taste-engine.js',import.meta.url),'utf8');
+  const archive=await readFile(new URL('../src/server/04-archive.js',import.meta.url),'utf8');
+  const router=await readFile(new URL('../src/server/06-router.js',import.meta.url),'utf8');
+  const html=await readFile(new URL('../dist/client/index.html',import.meta.url),'utf8');
+  const policy=await readFile(new URL('../quality/AI_ASSIST.md',import.meta.url),'utf8');
+  assert.match(engine,/LOCAL_AI_ZERO_COST_ACK/);
+  assert.match(engine,/LOCAL_AI_BLOCKED_HOSTS/);
+  assert.match(engine,/personalDataSent:false/);
+  assert.match(engine,/AbortSignal\.timeout\(3500\)/);
+  assert.match(engine,/validateLocalAiIntro/);
+  assert.match(engine,/validateLocalAiTags/);
+  assert.match(archive,/analyzeTasteAssisted/);
+  assert.match(router,/\/api\/ai-assist\/status/);
+  assert.match(html,/OPTIONAL AI ASSIST/);
+  assert.match(policy,/개인 감상문은 기존 엔진에서만 처리/);
+});
+
 test('metadata quality queue supports title, media, missing-field, and priority controls', async () => {
   const html = await readFile(new URL('../dist/client/index.html', import.meta.url), 'utf8');
   const core = await readFile(new URL('../src/client/01-core.js', import.meta.url), 'utf8');
