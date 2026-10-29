@@ -8,6 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="favicon.ico" sizes="any" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
   <title>취향 성좌 — 장르 밖으로 이어지는 작품</title>
@@ -203,6 +204,11 @@
       <section class="ai-assist-status" aria-labelledby="aiAssistStatusTitle">
         <header><div><p class="eyebrow">OPTIONAL AI ASSIST</p><h3 id="aiAssistStatusTitle">무료·로컬 모델 안전 상태</h3></div><span>기본 엔진 우선</span></header>
         <div id="aiAssistStatusSummary" class="ai-assist-status-summary" role="status" aria-live="polite"><p class="review-empty">AI 보조 안전장치를 확인하고 있어요.</p></div>
+      </section>
+      <section class="ai-editorial-ab" aria-labelledby="aiEditorialAbTitle">
+        <header><div><p class="eyebrow">BLIND EDITORIAL A/B</p><h3 id="aiEditorialAbTitle">40작품 사람 검수</h3></div><span>통과율 80% · 스포일러 0 · 선호 +5%p</span></header>
+        <div id="aiEditorialAbSummary" class="ai-editorial-ab-summary" role="status" aria-live="polite"><p class="review-empty">확대 A/B 검수 상태를 확인하고 있어요.</p></div>
+        <div id="aiEditorialAbList" class="ai-editorial-ab-list"></div>
       </section>
       <h3 class="metadata-review-heading">작품 정보 품질</h3>
       <div id="metadataQualitySummary" class="metadata-quality-summary"><p class="review-empty">정보 완성도를 계산하고 있어요.</p></div>

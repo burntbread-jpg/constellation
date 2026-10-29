@@ -254,6 +254,7 @@ async function routeApi(request,env,url){
   if(pathname==='/api/book-publishers')return request.method==='GET'?publicMetadata(await bookPublishers(request,env),21600):methodNotAllowed(['GET']);
   if(pathname==='/api/editorial-intro')return request.method==='POST'?editorialIntro(request,env):methodNotAllowed(['POST']);
   if(pathname==='/api/ai-assist/status')return request.method==='GET'?localAiStatus(request,env):methodNotAllowed(['GET']);
+  if(pathname==='/api/ai-editorial-ab')return ['GET','POST'].includes(request.method)?aiEditorialAb(request,env):methodNotAllowed(['GET','POST']);
   if(pathname==='/api/metadata-reports')return request.method==='POST'?metadataReport(request,env):request.method==='GET'?metadataReportQueue(request,env):methodNotAllowed(['GET','POST']);
   if(pathname==='/api/my-metadata-reports')return request.method==='GET'?myMetadataReports(request,env):methodNotAllowed(['GET']);
   if(pathname==='/api/metadata-quality')return request.method==='GET'?metadataQualityDashboard(request,env):methodNotAllowed(['GET']);
