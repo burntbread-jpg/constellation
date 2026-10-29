@@ -424,6 +424,7 @@ test.before(() => {
     }
     if (url.startsWith('https://ko.wikipedia.org/w/api.php')) {
       const title = new URL(url).searchParams.get('gpssearch');
+      if (title === '퍼펙트 데이즈') return response({query: {pages: [{pageid: 300, title: '퍼펙트 데이즈', terms: {description: ['빔 벤더스가 감독한 2023년 영화']}, original: {source: 'https://upload.wikimedia.org/perfect-days-poster.jpg'}}]}});
       if (title === '기생수') return response({query: {pages: [{pageid: 100, title: '기생수', terms: {description: ['일본의 만화 작품']}, original: {source: 'http://upload.wikimedia.org/parasyte-volume-1.jpg'}}]}});
       if (title === '강철의 연금술사') return response({query: {pages: [{pageid: 200, title: '강철의 연금술사', terms: {description: ['일본의 만화 작품']}, original: {source: 'https://upload.wikimedia.org/fma-volume-1.jpg'}}]}});
       return response({query: {pages: []}});
@@ -884,7 +885,18 @@ test('search reports free providers but excludes provider-ranked title mismatche
   assert.equal(data.sources['Google Books'], 'needs_key');
   assert.deepEqual(data.items.map(item => item.source).sort(), ['Open Library']);
   assert.equal(data.items.some(item=>item.title==='별의 아이'),false);
-  assert.equal(data.identityPolicy,'exact-title-media-v1');
+  assert.equal(data.identityPolicy,'exact-title-media-v2');
+});
+
+test('search uses Wikipedia to identify the exact film when TMDB and AniList are unavailable', async () => {
+  const result = await worker.fetch(new Request('https://site.test/api/search?q=%ED%8D%BC%ED%8E%99%ED%8A%B8%20%EB%8D%B0%EC%9D%B4%EC%A6%88'), env);
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.sources.TMDB, 'needs_key');
+  assert.equal(data.sources.Wikipedia, 'ok');
+  assert.equal(data.items[0].title, '퍼펙트 데이즈');
+  assert.equal(data.items[0].mediaType, 'FILM');
+  assert.equal(data.items[0].source, 'Wikipedia');
 });
 
 test('book search excludes web novels, study books, and records without a published edition', async () => {
