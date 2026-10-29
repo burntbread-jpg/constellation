@@ -441,6 +441,7 @@ test.before(() => {
     if (url.startsWith('https://www.wikidata.org/w/api.php')) {
       const request = new URL(url);
       if (request.searchParams.get('action') === 'wbsearchentities') {
+        if (request.searchParams.get('search') === '퍼펙트 데이즈') return response({search: [{id: 'Q119857233', label: '퍼펙트 데이즈', description: '빔 벤더스가 감독한 2023년 영화'}]});
         const id = request.searchParams.get('search') === '다른 책' ? 'Q999' : 'Q100';
         return response({search: [{id}]});
       }
@@ -885,10 +886,10 @@ test('search reports free providers but excludes provider-ranked title mismatche
   assert.equal(data.sources['Google Books'], 'needs_key');
   assert.deepEqual(data.items.map(item => item.source).sort(), ['Open Library']);
   assert.equal(data.items.some(item=>item.title==='별의 아이'),false);
-  assert.equal(data.identityPolicy,'exact-title-media-v2');
+  assert.equal(data.identityPolicy,'exact-title-media-v3');
 });
 
-test('search uses Wikipedia to identify the exact film when TMDB and AniList are unavailable', async () => {
+test('search uses structured Wikimedia identity to identify the exact film when TMDB and AniList are unavailable', async () => {
   const result = await worker.fetch(new Request('https://site.test/api/search?q=%ED%8D%BC%ED%8E%99%ED%8A%B8%20%EB%8D%B0%EC%9D%B4%EC%A6%88'), env);
   assert.equal(result.status, 200);
   const data = await result.json();
@@ -896,7 +897,7 @@ test('search uses Wikipedia to identify the exact film when TMDB and AniList are
   assert.equal(data.sources.Wikipedia, 'ok');
   assert.equal(data.items[0].title, '퍼펙트 데이즈');
   assert.equal(data.items[0].mediaType, 'FILM');
-  assert.equal(data.items[0].source, 'Wikipedia');
+  assert.ok(['Wikipedia','Wikidata'].includes(data.items[0].source));
 });
 
 test('book search excludes web novels, study books, and records without a published edition', async () => {
