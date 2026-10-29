@@ -112,7 +112,7 @@ test('search identity and anime artwork use strict multi-provider fallbacks', as
   const providers=await readFile(new URL('../src/server/01-providers.js',import.meta.url),'utf8');
   const router=await readFile(new URL('../src/server/06-router.js',import.meta.url),'utf8');
   assert.match(providers,/searchIdentityScore/);
-  assert.match(providers,/identityPolicy:'exact-title-media-v3'/);
+  assert.match(providers,/identityPolicy:'exact-title-media-v4'/);
   assert.match(providers,/wikipediaSearch/);
   assert.match(providers,/wikidataSearchIdentity/);
   assert.match(providers,/genre_ids\.includes\(16\)/);

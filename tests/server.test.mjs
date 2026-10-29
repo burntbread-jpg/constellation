@@ -398,6 +398,7 @@ test.before(() => {
     }
     if (url.startsWith('https://www.googleapis.com/books/v1/volumes')) {
       const query = new URL(url).searchParams.get('q') || '';
+      if (query === '퍼펙트 데이즈') return response({items: [{id: 'perfect-days-book', volumeInfo: {title: '퍼펙트 데이즈', authors: ['동명 저자'], publisher: '일반출판사', publishedDate: '2024', imageLinks: {large: 'http://books.test/perfect-days.jpg'}}}]});
       if (query === '기생수') return response({items: [
         {id: 'parasite-16', volumeInfo: {title: '기생수 16(완결)', authors: ['Hitoshi Iwaaki'], publishedDate: '2016', language: 'ko', categories: ['Comics & Graphic Novels'], imageLinks: {large: 'http://books.test/parasite-16.jpg'}}},
         {id: 'parasite-12', volumeInfo: {title: '기생수 12', authors: ['Hitoshi Iwaaki'], publishedDate: '2016', language: 'ko', categories: ['Comics & Graphic Novels'], imageLinks: {large: 'http://books.test/parasite-12.jpg'}}},
@@ -886,11 +887,11 @@ test('search reports free providers but excludes provider-ranked title mismatche
   assert.equal(data.sources['Google Books'], 'needs_key');
   assert.deepEqual(data.items.map(item => item.source).sort(), ['Open Library']);
   assert.equal(data.items.some(item=>item.title==='별의 아이'),false);
-  assert.equal(data.identityPolicy,'exact-title-media-v3');
+  assert.equal(data.identityPolicy,'exact-title-media-v4');
 });
 
 test('search uses structured Wikimedia identity to identify the exact film when TMDB and AniList are unavailable', async () => {
-  const result = await worker.fetch(new Request('https://site.test/api/search?q=%ED%8D%BC%ED%8E%99%ED%8A%B8%20%EB%8D%B0%EC%9D%B4%EC%A6%88'), env);
+  const result = await worker.fetch(new Request('https://site.test/api/search?q=%ED%8D%BC%ED%8E%99%ED%8A%B8%20%EB%8D%B0%EC%9D%B4%EC%A6%88'), {...env,GOOGLE_BOOKS_API_KEY:'test-key'});
   assert.equal(result.status, 200);
   const data = await result.json();
   assert.equal(data.sources.TMDB, 'needs_key');
@@ -898,6 +899,7 @@ test('search uses structured Wikimedia identity to identify the exact film when 
   assert.equal(data.items[0].title, '퍼펙트 데이즈');
   assert.equal(data.items[0].mediaType, 'FILM');
   assert.ok(['Wikipedia','Wikidata'].includes(data.items[0].source));
+  assert.equal(data.items[1].mediaType, 'BOOK');
 });
 
 test('book search excludes web novels, study books, and records without a published edition', async () => {
