@@ -92,7 +92,7 @@ function mockSupabase(url, init = {}) {
     if(status?.startsWith('in.(')){const values=status.slice(4,-1).split(',');rows=rows.filter(row=>values.includes(row.status))}
     return response([...rows].sort((a,b)=>b.id-a.id).slice(0,Number(parsed.searchParams.get('limit'))||rows.length));
   }
-  if(method==='POST'&&table==='ai_editorial_ab_runs'){const row={id:state.aiAbRuns.length+1,status:'collecting',min_pass_rate:.8,max_spoilers:0,min_preference_uplift:.05,created_at:new Date().toISOString(),...body};state.aiAbRuns.push(row);return response([row],201)}
+  if(method==='POST'&&table==='ai_editorial_ab_runs'){const row={id:state.aiAbRuns.length+1,status:'collecting',min_reviews_per_work:2,min_agreement_rate:.7,min_pass_rate:.8,max_spoilers:0,min_preference_uplift:.05,created_at:new Date().toISOString(),...body};state.aiAbRuns.push(row);return response([row],201)}
   if(method==='PATCH'&&table==='ai_editorial_ab_runs'){const id=Number(parsed.searchParams.get('id')?.replace(/^eq\./,'')),row=state.aiAbRuns.find(item=>item.id===id);if(row)Object.assign(row,body);return response(null,204)}
   if(method==='GET'&&table==='ai_editorial_ab_items'){
     const runId=Number(parsed.searchParams.get('run_id')?.replace(/^eq\./,'')),id=Number(parsed.searchParams.get('id')?.replace(/^eq\./,'')),outcome=parsed.searchParams.get('candidate_outcome')?.replace(/^eq\./,'');let rows=state.aiAbItems.filter(row=>(!runId||row.run_id===runId)&&(!id||row.id===id)&&(!outcome||row.candidate_outcome===outcome));return response(rows.slice(0,Number(parsed.searchParams.get('limit'))||rows.length));
@@ -892,17 +892,20 @@ test('optional AI status is reviewer-only and blocks metered providers', async (
   assert.equal(data.guardrails.deterministicFallback,true);
 });
 
-test('40-work blinded human review promotes AI copy only after every release gate passes', async () => {
+test('40-work blinded human review requires two independent reviewers and agreement before promotion', async () => {
   state.aiAbRuns=[];state.aiAbItems=[];state.aiAbReviews=[];
-  const reviewerId='74747474-7474-4474-8474-747474747474',reviewerHeaders={'oai-authenticated-user-id':reviewerId,'content-type':'application/json'},reviewerEnv={...env,METADATA_REVIEWER_IDS:reviewerId,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-ab',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions',LOCAL_AI_DAILY_LIMIT:'50',LOCAL_AI_HOURLY_PER_USER_LIMIT:'10'};
+  const reviewerId='74747474-7474-4474-8474-747474747474',secondReviewerId='75757575-7575-4575-8575-757575757575',reviewerHeaders={'oai-authenticated-user-id':reviewerId,'content-type':'application/json'},secondHeaders={'oai-authenticated-user-id':secondReviewerId,'content-type':'application/json'},reviewerEnv={...env,METADATA_REVIEWER_IDS:`${reviewerId},${secondReviewerId}`,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-ab',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions',LOCAL_AI_DAILY_LIMIT:'50',LOCAL_AI_HOURLY_PER_USER_LIMIT:'10'};
   const started=await worker.fetch(new Request('https://site.test/api/ai-editorial-ab',{method:'POST',headers:reviewerHeaders,body:JSON.stringify({action:'start'})}),reviewerEnv),startData=await started.json();
   assert.equal(started.status,201);assert.equal(startData.metrics.target,40);assert.equal(state.aiAbItems.length,40);
   const generated=await worker.fetch(new Request('https://site.test/api/ai-editorial-ab',{method:'POST',headers:reviewerHeaders,body:JSON.stringify({action:'generate'})}),reviewerEnv);
   assert.equal(generated.status,200);assert.equal(state.aiAbItems.filter(item=>item.candidate_outcome!=='pending').length,5);
   for(const item of state.aiAbItems){Object.assign(item,{candidate_text:'창문 하나로 잃어버린 기억과 남은 마음의 거리를 재어 보는 작품.',candidate_outcome:'accepted',machine_pass:true,generated_at:new Date().toISOString()})}
-  state.aiAbReviews=state.aiAbItems.slice(0,39).map((item,index)=>({id:index+1,item_id:item.id,reviewer_id:reviewerId,quality_pass:true,spoiler:false,preference:'candidate',control_score:3,candidate_score:5,updated_at:new Date().toISOString()}));
-  const finalItem=state.aiAbItems[39],preference=finalItem.candidate_first?'A':'B',reviewed=await worker.fetch(new Request('https://site.test/api/ai-editorial-ab',{method:'POST',headers:reviewerHeaders,body:JSON.stringify({action:'review',itemId:finalItem.id,preference,qualityPass:true,spoiler:false,controlScore:3,candidateScore:5})}),reviewerEnv),reviewData=await reviewed.json();
-  assert.equal(reviewed.status,200);assert.equal(reviewData.run.status,'promoted');assert.equal(reviewData.metrics.passRate,1);assert.equal(reviewData.metrics.spoilers,0);assert.equal(reviewData.metrics.preferenceUplift,1);assert.equal(reviewData.metrics.promotable,true);
+  state.aiAbReviews=state.aiAbItems.map((item,index)=>({id:index+1,item_id:item.id,reviewer_id:reviewerId,quality_pass:true,spoiler:false,preference:'candidate',control_score:3,candidate_score:5,updated_at:new Date().toISOString()}));
+  const beforeSecond=await worker.fetch(new Request('https://site.test/api/ai-editorial-ab',{headers:{'oai-authenticated-user-id':reviewerId}}),reviewerEnv),beforeData=await beforeSecond.json();
+  assert.equal(beforeData.metrics.reviewed,0);assert.equal(beforeData.metrics.uniqueReviewers,1);assert.equal(beforeData.metrics.promotable,false);
+  state.aiAbReviews.push(...state.aiAbItems.slice(0,39).map((item,index)=>({id:41+index,item_id:item.id,reviewer_id:secondReviewerId,quality_pass:true,spoiler:false,preference:'candidate',control_score:3,candidate_score:5,updated_at:new Date().toISOString()})));
+  const finalItem=state.aiAbItems[39],preference=finalItem.candidate_first?'A':'B',reviewed=await worker.fetch(new Request('https://site.test/api/ai-editorial-ab',{method:'POST',headers:secondHeaders,body:JSON.stringify({action:'review',itemId:finalItem.id,preference,qualityPass:true,spoiler:false,controlScore:3,candidateScore:5})}),reviewerEnv),reviewData=await reviewed.json();
+  assert.equal(reviewed.status,200);assert.equal(reviewData.run.status,'promoted');assert.equal(reviewData.metrics.reviewed,40);assert.equal(reviewData.metrics.reviewCount,80);assert.equal(reviewData.metrics.uniqueReviewers,2);assert.equal(reviewData.metrics.agreementRate,1);assert.equal(reviewData.metrics.passRate,1);assert.equal(reviewData.metrics.spoilers,0);assert.equal(reviewData.metrics.preferenceUplift,1);assert.equal(reviewData.metrics.promotable,true);
 });
 
 test('cultural context rejects an ambiguous Wikidata candidate', async () => {

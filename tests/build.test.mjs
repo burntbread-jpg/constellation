@@ -505,12 +505,14 @@ test('stage 72 recommendation metrics are aggregate-only, private, retained, and
 
 test('AI editorial default activation requires a private 40-work blinded human A/B gate',async()=>{
   const migration=await readFile(new URL('../supabase/migrations/20261029044823_ai_editorial_human_ab.sql',import.meta.url),'utf8');
+  const consensusMigration=await readFile(new URL('../supabase/migrations/20261029135952_ai_editorial_ab_consensus.sql',import.meta.url),'utf8');
   const server=await readFile(new URL('../src/server/03-taste-engine.js',import.meta.url),'utf8');
   const html=await readFile(new URL('../dist/client/index.html',import.meta.url),'utf8');
   const favicon=await readFile(new URL('../dist/client/favicon.ico',import.meta.url));
   assert.match(migration,/target_work_count between 30 and 50/);assert.match(migration,/default 0\.80/);assert.match(migration,/default 0\.05/);assert.match(migration,/max_spoilers integer not null default 0/);
   assert.match(migration,/enable row level security/);assert.match(migration,/revoke all on public\.ai_editorial_ab_reviews from anon, authenticated/);
+  assert.match(consensusMigration,/min_reviews_per_work smallint not null default 2/);assert.match(consensusMigration,/min_agreement_rate numeric\(5,4\) not null default 0\.70/);
   assert.match(server,/const AI_EDITORIAL_AB_SAMPLE=/);assert.equal((server.match(/\['(?:ANIME|FILM|BOOK|MANGA)'/g)||[]).length,40);
-  assert.match(server,/generated>=30/);assert.match(server,/reviewed\.length>=30/);assert.match(server,/passRate>=Number\(run\.min_pass_rate/);assert.match(server,/preferenceUplift>=Number\(run\.min_preference_uplift/);
+  assert.match(server,/generated>=30/);assert.match(server,/eligible\.length>=30/);assert.match(server,/reviewers\.size>=2/);assert.match(server,/agreementRate>=minAgreement/);assert.match(server,/passRate>=Number\(run\.min_pass_rate/);assert.match(server,/preferenceUplift>=Number\(run\.min_preference_uplift/);
   assert.match(html,/aiEditorialAbSummary/);assert.match(html,/href="favicon\.ico"/);assert.ok(favicon.length>100);
 });

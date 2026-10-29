@@ -1,5 +1,7 @@
 # Taste Constellation release roadmap
 
+> 출시 완성도 95점 목표의 최신 고정 실행 순서와 합격 기준은 [`quality/RELEASE_TO_95_PLAN.md`](quality/RELEASE_TO_95_PLAN.md)를 따른다. 아래 64~73 표는 이전 제품·운영 마일스톤의 추적 기록이다.
+
 The numbered release roadmap below is canonical. Security hardening work that was
 previously labelled as stages 67–72 is tracked separately as **S67–S72** so it
 does not replace the product and operations milestones.
