@@ -1,13 +1,13 @@
 # Taste Constellation architecture
 
-`src/` is the canonical JavaScript source. `npm run build` composes its ordered modules into the two files consumed by Sites:
+`src/` is the canonical JavaScript source. `npm run build` composes its ordered modules into the browser bundle and the server module consumed by Vercel:
 
 - `dist/client/app.js`: browser application
-- `dist/server/index.js`: Sites server worker
+- `dist/server/index.js`: Web-standard API worker imported by the Vercel catch-all function
 
 The client is separated into core/detail rendering, recommendations, archive management, and event wiring. The server is separated into external providers, persistence and normalization, the Taste DNA engine, archive APIs, recommendations, and the router.
 
-The source modules are concatenated deliberately. This preserves the existing browser and worker runtime without introducing a bundler or changing shared lexical state. `tests/build.test.mjs` prevents generated artifacts from drifting away from their source modules.
+The source modules are concatenated deliberately. This preserves the existing browser and Web API runtime without introducing a bundler or changing shared lexical state. `tests/build.test.mjs` prevents generated artifacts from drifting away from their source modules. Vercel serves `dist/client` and `api/[...path].js` forwards every `/api/*` request to the same worker module.
 
 ## Commands
 
@@ -36,7 +36,7 @@ The source modules are concatenated deliberately. This preserves the existing br
 - The metadata review dialog renders those deep-check readiness flags as an operator dashboard and supports an explicit no-cache refresh. Authorization remains enforced by the server endpoint.
 - Deep health also probes configured/free metadata providers and reports a rolling five-minute API 5xx/slow-request snapshot. Provider outages are warnings while database or pgvector failures are service degradation; the reviewer dashboard refreshes automatically every 60 seconds while open.
 - Successful core health probes are retained for 30 days in a service-role-only table. The dashboard summarizes the latest 24 hours and highlights three or more consecutive warning/degraded checks without storing visitor identity or request payloads.
-- Supabase Cron calls `POST /api/health/scheduled` every five minutes with Vault-backed monitor and Sites service-access tokens, so checks continue while the dashboard is closed. The endpoint is not authorized by visitor identity.
+- Supabase Cron calls `POST /api/health/scheduled` every five minutes with the Vault-backed monitor token, so checks continue while the dashboard is closed. The endpoint is not authorized by visitor identity.
 - Alert events are durable and service-role-only. A configured Slack/Discord-compatible webhook is notified only when the service first degrades, a warning persists for three checks, or a non-ready state recovers; failed deliveries remain queued for the next scheduled run.
 - The reviewer operations panel shows the latest sanitized alert history, including pending or failed delivery state, without exposing webhook URLs, provider payloads, or raw delivery errors.
 - Reviewers can acknowledge, resolve, and reopen operational incidents with required notes. A PostgreSQL function locks each alert and atomically updates its lifecycle snapshot plus an append-only action history; the dashboard exposes notes and timestamps but never reviewer identifiers.
