@@ -38,22 +38,22 @@ jobs:
 
       - name: Package deterministic deployment artifact
         run: |
-          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner -czf site-dist.tar.gz dist .openai/hosting.json
-          sha256sum site-dist.tar.gz > site-dist.tar.gz.sha256
+          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner -czf vercel-dist.tar.gz dist/client dist/server api vercel.json
+          sha256sum vercel-dist.tar.gz > vercel-dist.tar.gz.sha256
 
       - name: Attest build provenance
         id: attest
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
-          subject-path: site-dist.tar.gz
+          subject-path: vercel-dist.tar.gz
 
       - name: Retain attested build
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: site-build-${{ github.sha }}
+          name: vercel-build-${{ github.sha }}
           path: |
-            site-dist.tar.gz
-            site-dist.tar.gz.sha256
+            vercel-dist.tar.gz
+            vercel-dist.tar.gz.sha256
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
