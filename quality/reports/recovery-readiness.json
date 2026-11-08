@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "migrationCount": 29,
+  "migrationCount": 32,
   "migrations": [
     {
       "name": "20261005_stage15_archive_management.sql",
@@ -146,6 +146,21 @@
       "name": "20261028075520_stage72_recommendation_learning_metrics.sql",
       "sha256": "c7dcc5a82a512cb86e66ccefa317ef356b23c010db734f82deb8a81cc01298be",
       "bytes": 4920
+    },
+    {
+      "name": "20261029044823_ai_editorial_human_ab.sql",
+      "sha256": "65f8467a39b3ceefcc26cf400321d3fd12d30a68a0e4ba97878c94209539e10d",
+      "bytes": 3664
+    },
+    {
+      "name": "20261029045600_ai_editorial_ab_deny_policies.sql",
+      "sha256": "f6c533483837297bf57c724d66a6a1c26f0814609b428e8d888b562feb961169",
+      "bytes": 708
+    },
+    {
+      "name": "20261029135952_ai_editorial_ab_consensus.sql",
+      "sha256": "52ac98aec6ec919b7825e2a7d473ec18002196143bf245396cdf5baa9a33e057",
+      "bytes": 595
     }
   ],
   "schemaSha256": "871346792d5eacf1f77a53682866ed5fa652004de9a83a62cf31fbfa9de0efa8",
