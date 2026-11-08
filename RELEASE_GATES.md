@@ -6,7 +6,7 @@
 |---:|---|---|---|
 | 1 | Vercel용 Supabase Auth | 운영 로그인 UI·Supabase Bearer 검증·위조 헤더 차단·운영 URL 설정 확인 | 완료 |
 | 2 | CI 121/121 및 전체 Actions 녹색 | 로컬 121/121, 기본 브랜치의 필수 Actions 전부 성공 | 완료 |
-| 3 | Supabase Cron을 Vercel로 이전 | Vercel Cron 실행·인증·로그, Supabase의 기존 Sites 호출 제거 | 대기 |
+| 3 | Supabase Cron을 Vercel로 이전 | Vercel Cron 실행·인증·로그, Supabase의 기존 Sites 호출 제거 | 완료 |
 | 4 | 운영 로그인 E2E | PC·모바일에서 로그인→검색→저장→성좌→추천→삭제·복원 성공 | 대기 |
 | 5 | 카탈로그·포스터 100작품 검수 | 100작품의 제목·매체·연도·창작자·포스터·소개 완성률 98% 이상 | 대기 |
 | 6 | 40작품 사람 A/B 검수 | 작품당 2인 독립 평가, AI 통과율 80%+, 스포일러 0, 선호도 +5%p | 대기 |
@@ -20,3 +20,12 @@
 3. 실패한 검증은 숨기지 않고 해당 단계의 차단 사유로 기록한다.
 4. 단계의 범위를 바꿀 때는 이 문서의 번호와 완료 조건을 먼저 갱신한다.
 5. 운영 비밀키는 저장소·클라이언트·로그에 기록하지 않는다.
+
+## 단계 3 완료 증거 (2026-11-09)
+
+- Production 배포 `39x6SEEmSmbN74CA3RExpVNRniWj`가 `constellation-swart.vercel.app`의 Current로 확인됐다.
+- Vercel Cron Jobs에서 health, data retention, recommendation metrics 세 경로가 모두 Active로 등록됐다.
+- `/api/cron-health`를 Vercel에서 수동 실행해 `vercel_cron_complete`, `ok: true`, `database: true`, `pgvector: true` 로그를 확인했다.
+- Production의 Supabase 서비스 역할 키를 현재 프로젝트 키로 교정한 뒤 재배포했다. 비밀값은 저장소와 문서에 기록하지 않았다.
+- 마이그레이션 `migrate_cron_to_vercel`을 운영 DB에 적용했고, 이전 Supabase `pg_cron` 작업 3개가 더 이상 존재하지 않음을 조회로 확인했다.
+- 마이그레이션 후 Supabase Security·Health advisor는 경고 0건이다. Performance advisor의 기존 미사용 인덱스 INFO 10건만 남아 있으며 이 이전 작업의 차단 사유는 아니다.
