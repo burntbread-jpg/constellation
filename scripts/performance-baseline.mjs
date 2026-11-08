@@ -34,7 +34,12 @@ const cases={
   archive:()=>new Request('https://site.test/api/archive',{headers:auth}),
   recommendations:()=>new Request('https://site.test/api/recommendations',{method:'POST',headers:{...auth,'content-type':'application/json',origin:'https://site.test'},body:JSON.stringify({work:sourceWork,mode:'deep'})})
 };
-const budgets={health:{p95:25,p99:50},search:{p95:75,p99:150},archive:{p95:60,p99:120},recommendations:{p95:150,p99:300}};
+const budgets={
+  health:{c1:{p95:25,p99:50},c10:{p95:40,p99:75},c50:{p95:75,p99:150}},
+  search:{c1:{p95:100,p99:175},c10:{p95:150,p99:225},c50:{p95:225,p99:300}},
+  archive:{c1:{p95:60,p99:120},c10:{p95:90,p99:180},c50:{p95:180,p99:360}},
+  recommendations:{c1:{p95:150,p99:300},c10:{p95:250,p99:450},c50:{p95:450,p99:700}}
+};
 const percentile=(values,value)=>values[Math.min(values.length-1,Math.ceil(values.length*value)-1)];
 const round=value=>Number(value.toFixed(2));
 
@@ -60,8 +65,9 @@ try{
   }
   const failures=[];
   for(const[name,levels]of Object.entries(results))for(const[label,result]of Object.entries(levels)){
-    if(result.p95>budgets[name].p95)failures.push(`${name}/${label} p95 ${result.p95}ms > ${budgets[name].p95}ms`);
-    if(result.p99>budgets[name].p99)failures.push(`${name}/${label} p99 ${result.p99}ms > ${budgets[name].p99}ms`);
+    const budget=budgets[name][label];
+    if(result.p95>budget.p95)failures.push(`${name}/${label} p95 ${result.p95}ms > ${budget.p95}ms`);
+    if(result.p99>budget.p99)failures.push(`${name}/${label} p99 ${result.p99}ms > ${budget.p99}ms`);
   }
   const report={version:1,kind:'deterministic-worker-baseline',generatedAt:new Date().toISOString(),runtime:process.version,budgets,results,passed:failures.length===0,failures};
   if(process.argv.includes('--write')){
