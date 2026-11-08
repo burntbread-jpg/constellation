@@ -603,8 +603,8 @@ async function scheduledHealth(request,env){
 
 async function routeApi(request,env,url){
   const {pathname}=url;
-  if(pathname==='/api/auth/config')return request.method==='GET'?json({supabaseUrl:env.SUPABASE_URL||'',publishableKey:env.SUPABASE_PUBLISHABLE_KEY||'',method:'magic-link'},env.SUPABASE_URL&&env.SUPABASE_PUBLISHABLE_KEY?200:503,{'cache-control':'public, max-age=300'}):methodNotAllowed(['GET']);
-  if(pathname==='/api/auth/session'){if(request.method!=='GET')return methodNotAllowed(['GET']);const user=await currentUser(request);return user?json({user:{id:user.id,email:user.email}}):json({error:'로그인이 필요합니다.'},401)}
+  if(pathname==='/api/auth-config')return request.method==='GET'?json({supabaseUrl:env.SUPABASE_URL||'',publishableKey:env.SUPABASE_PUBLISHABLE_KEY||'',method:'magic-link'},env.SUPABASE_URL&&env.SUPABASE_PUBLISHABLE_KEY?200:503):methodNotAllowed(['GET']);
+  if(pathname==='/api/auth-session'){if(request.method!=='GET')return methodNotAllowed(['GET']);const user=await currentUser(request);return user?json({user:{id:user.id,email:user.email}}):json({error:'로그인이 필요합니다.'},401)}
   if(pathname==='/api/search')return request.method==='GET'?publicMetadata(await search(request,env),300):methodNotAllowed(['GET']);
   if(pathname==='/api/artwork')return request.method==='GET'?publicMetadata(await resilientArtwork(request,env),86400):methodNotAllowed(['GET']);
   if(pathname==='/api/cultural-context')return request.method==='GET'?publicMetadata(await culturalContext(request),86400):methodNotAllowed(['GET']);

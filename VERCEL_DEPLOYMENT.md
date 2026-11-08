@@ -30,7 +30,7 @@ Supabase Auth URL Configuration must contain:
 - Site URL: `https://constellation-swart.vercel.app`
 - Redirect URL: `https://constellation-swart.vercel.app/**`
 
-Never expose `SUPABASE_SERVICE_ROLE_KEY` in HTML, browser JavaScript, or `/api/auth/config`.
+Never expose `SUPABASE_SERVICE_ROLE_KEY` in HTML, browser JavaScript, or `/api/auth-config`.
 
 ## Verification
 
@@ -39,7 +39,7 @@ After a production deployment:
 1. Open `/api/health` and confirm HTTP 200.
 2. Search for at least one film, book, and anime.
 3. Confirm the browser shell and service worker load from the same bundle version.
-4. Request a Magic Link, return to the production domain, confirm `/api/auth/session` returns the signed-in user, then sign out.
+4. Request a Magic Link, return to the production domain, confirm `/api/auth-session` returns the signed-in user, then sign out.
 5. Confirm a forged `oai-authenticated-user-id` header cannot access `/api/archive`.
 6. Check Vercel Function logs for `/api/search` and `/api/artwork` failures.
 7. Point the Supabase scheduled-health URL to the final Vercel production domain before retiring the prior host.
