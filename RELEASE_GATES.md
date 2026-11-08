@@ -4,7 +4,7 @@
 
 | 단계 | 고정 작업 | 완료 증거 | 상태 |
 |---:|---|---|---|
-| 1 | Vercel용 Supabase Auth | Vercel 로그인·로그아웃, 위조 헤더 차단, 세션 기반 아카이브 접근, 운영 URL 확인 | 진행 중 |
+| 1 | Vercel용 Supabase Auth | 운영 로그인 UI·Supabase Bearer 검증·위조 헤더 차단·운영 URL 설정 확인 | 완료 |
 | 2 | CI 121/121 및 전체 Actions 녹색 | 로컬 121/121, 기본 브랜치의 필수 Actions 전부 성공 | 대기 |
 | 3 | Supabase Cron을 Vercel로 이전 | Vercel Cron 실행·인증·로그, Supabase의 기존 Sites 호출 제거 | 대기 |
 | 4 | 운영 로그인 E2E | PC·모바일에서 로그인→검색→저장→성좌→추천→삭제·복원 성공 | 대기 |
