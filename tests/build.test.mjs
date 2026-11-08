@@ -305,9 +305,9 @@ test('GitHub Actions blocks build, recommendation, security, accessibility, and 
   assert.doesNotMatch(provenance,/pull_request:/);
   assert.match(provenance,/git diff --exit-code -- dist/);
   assert.match(provenance,/--sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner/);
-  assert.match(provenance,/sha256sum site-dist\.tar\.gz/);
+  assert.match(provenance,/sha256sum vercel-dist\.tar\.gz/);
   assert.match(provenance,/actions\/attest-build-provenance@[0-9a-f]{40}/i);
-  assert.match(provenance,/subject-path: site-dist\.tar\.gz/);
+  assert.match(provenance,/subject-path: vercel-dist\.tar\.gz/);
   assert.match(provenance,/retention-days: 30/);
   assert.match(provenance,/compression-level: 0/);
   const actionReferences=[...`${workflow}\n${codeql}\n${secretScan}\n${sbom}\n${provenance}`.matchAll(/^\s*uses:\s*([^\s#]+)/gm)].map(match=>match[1]);
