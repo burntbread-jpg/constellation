@@ -8,6 +8,20 @@
       "maxDuration": 30
     }
   },
+  "crons": [
+    {
+      "path": "/api/cron-health",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron-retention",
+      "schedule": "40 3 * * *"
+    },
+    {
+      "path": "/api/cron-recommendation-metrics",
+      "schedule": "15 4 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/service-worker.js",

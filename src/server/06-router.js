@@ -145,9 +145,9 @@ function secureTokenMatch(left,right){
   const a=String(left||''),b=String(right||'');if(!a||!b||a.length!==b.length)return false;let mismatch=0;for(let index=0;index<a.length;index++)mismatch|=a.charCodeAt(index)^b.charCodeAt(index);return mismatch===0;
 }
 
-function monitorAuthorized(request,env){
-  const header=request.headers.get('authorization')||'',bearer=header.startsWith('Bearer ')?header.slice(7):'',token=request.headers.get('x-health-monitor-token')||bearer;
-  return secureTokenMatch(token,env.HEALTH_MONITOR_TOKEN);
+function cronAuthorized(request,env){
+  const header=request.headers.get('authorization')||'',bearer=header.match(/^Bearer\s+(.+)$/i)?.[1]||'';
+  return secureTokenMatch(bearer,env.CRON_SECRET);
 }
 
 function requestId(request){
@@ -257,9 +257,34 @@ async function deepHealth(request,env){
   return operationalHealth(env,{includeAlerts:true});
 }
 
-async function scheduledHealth(request,env){
-  if(!monitorAuthorized(request,env))return json({error:'모니터 인증에 실패했습니다.'},401);
-  return operationalHealth(env,{emitAlerts:true});
+function cronLog(task,startedAt,result,error){
+  const payload={event:'vercel_cron_complete',task,ok:!error,durationMs:Math.max(0,Math.round(performance.now()-startedAt)),completedAt:new Date().toISOString()};
+  if(error){payload.error=String(error instanceof Error?error.message:error).slice(0,300);console.error(JSON.stringify(payload))}
+  else{payload.result=result;console.info(JSON.stringify(payload))}
+}
+
+async function vercelCron(request,env,task){
+  if(!cronAuthorized(request,env))return json({error:'Cron 인증에 실패했습니다.'},401);
+  if(!dbReady(env))return json({error:'데이터베이스가 구성되지 않았습니다.'},503);
+  const startedAt=performance.now();
+  try{
+    let result;
+    if(task==='health'){
+      const response=await operationalHealth(env,{emitAlerts:true});
+      const body=await response.json();
+      result={status:body.status||'unknown',database:Boolean(body.checks?.database),pgvector:Boolean(body.checks?.pgvector),providerFailures:Object.values(body.providers||{}).filter(value=>value==='error').length};
+      cronLog(task,startedAt,result,response.ok?null:new Error(`Health status ${response.status}`));
+      return json({ok:response.ok,task,result,completedAt:new Date().toISOString()},response.ok?200:503);
+    }
+    if(task==='retention')result=await supabase(env,'rpc/run_data_retention',{method:'POST',body:{}});
+    else if(task==='recommendation-metrics')result={deleted:await supabase(env,'rpc/prune_recommendation_metrics',{method:'POST',body:{}})};
+    else return json({error:'알 수 없는 Cron 작업입니다.'},404);
+    cronLog(task,startedAt,result);
+    return json({ok:true,task,result,completedAt:new Date().toISOString()});
+  }catch(error){
+    cronLog(task,startedAt,null,error);
+    return json({ok:false,task,error:'예약 작업을 완료하지 못했습니다.',completedAt:new Date().toISOString()},500);
+  }
 }
 
 async function routeApi(request,env,url){
@@ -305,7 +330,9 @@ async function routeApi(request,env,url){
   }
   if(pathname==='/api/health/deep')return request.method==='GET'?deepHealth(request,env):methodNotAllowed(['GET']);
   if(pathname.startsWith('/api/health/alerts/')){const id=pathname.slice('/api/health/alerts/'.length);return request.method==='PATCH'?updateHealthAlertLifecycle(request,env,id):methodNotAllowed(['PATCH'])}
-  if(pathname==='/api/health/scheduled')return request.method==='POST'?scheduledHealth(request,env):methodNotAllowed(['POST']);
+  if(pathname==='/api/cron-health')return request.method==='GET'?vercelCron(request,env,'health'):methodNotAllowed(['GET']);
+  if(pathname==='/api/cron-retention')return request.method==='GET'?vercelCron(request,env,'retention'):methodNotAllowed(['GET']);
+  if(pathname==='/api/cron-recommendation-metrics')return request.method==='GET'?vercelCron(request,env,'recommendation-metrics'):methodNotAllowed(['GET']);
   if(pathname==='/api/health'){
     if(request.method!=='GET')return methodNotAllowed(['GET']);
     return json({

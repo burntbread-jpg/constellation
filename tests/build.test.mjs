@@ -190,20 +190,28 @@ test('health check history is private, indexed, and retained by the service', as
   assert.match(migration, /health_check_runs_checked_at_idx/);
 });
 
-test('scheduled health alerts are private, durable, and use Vault-backed cron secrets', async () => {
+test('scheduled operations are private, durable, and owned by authenticated Vercel Cron', async () => {
   const migration=await readFile(new URL('../supabase/migrations/20261019_stage59_health_alerts.sql',import.meta.url),'utf8');
   const schedule=await readFile(new URL('../supabase/stage59_schedule_health_monitor.sql',import.meta.url),'utf8');
+  const retirement=await readFile(new URL('../supabase/migrations/20261108140001_migrate_cron_to_vercel.sql',import.meta.url),'utf8');
   const server=await readFile(new URL('../src/server/06-router.js',import.meta.url),'utf8');
+  const vercel=JSON.parse(await readFile(new URL('../vercel.json',import.meta.url),'utf8'));
   assert.match(migration,/create table if not exists public\.health_alert_events/);
   assert.match(migration,/where delivered_at is null/);
   assert.match(migration,/enable row level security/);
   assert.match(migration,/revoke all on public\.health_alert_events from anon, authenticated/);
-  assert.match(schedule,/vault\.decrypted_secrets/);
-  assert.match(schedule,/OAI-Sites-Authorization/);
-  assert.match(schedule,/\*\/5 \* \* \* \*/);
-  assert.doesNotMatch(schedule,/Bearer [A-Za-z0-9_-]{12,}/);
-  assert.match(server,/\/api\/health\/scheduled/);
-  assert.match(server,/HEALTH_MONITOR_TOKEN/);
+  assert.match(schedule,/RETIRED/);
+  assert.doesNotMatch(schedule,/net\.http_post|chatgpt\.site|OAI-Sites-Authorization/);
+  assert.match(retirement,/cron\.unschedule/);
+  assert.match(retirement,/taste-constellation-health-monitor/);
+  assert.match(retirement,/taste-constellation-data-retention/);
+  assert.match(retirement,/taste-constellation-recommendation-metrics-retention/);
+  assert.deepEqual(vercel.crons.map(job=>job.path),['/api/cron-health','/api/cron-retention','/api/cron-recommendation-metrics']);
+  assert.ok(vercel.crons.every(job=>job.schedule.split(' ').length===5));
+  assert.match(server,/CRON_SECRET/);
+  assert.match(server,/vercel_cron_complete/);
+  assert.match(server,/rpc\/run_data_retention/);
+  assert.match(server,/rpc\/prune_recommendation_metrics/);
   assert.match(server,/HEALTH_ALERT_WEBHOOK_URL/);
 });
 

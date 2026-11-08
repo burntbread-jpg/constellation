@@ -33,6 +33,8 @@ const state = {
   webhookCalls: [],
   rateBuckets: new Map(),
   recommendationMetrics: [],
+  cronRetentionRuns: [],
+  cronMetricPrunes: 0,
   catalogQueries: [],
   profileWrites: 0,
   backfillCalls: 0,
@@ -77,6 +79,14 @@ function mockSupabase(url, init = {}) {
   const body = init.body ? JSON.parse(init.body) : null;
 
   if (state.failHealth) return response({message: 'database unavailable'}, 500);
+
+  if(method==='POST'&&table==='run_data_retention'){
+    const result={runId:state.cronRetentionRuns.length+1,policyVersion:1,counts:{connections:0},durationMs:2};
+    state.cronRetentionRuns.push(result);return response(result);
+  }
+  if(method==='POST'&&table==='prune_recommendation_metrics'){
+    state.cronMetricPrunes++;return response(0);
+  }
 
   if(method==='POST'&&table==='consume_api_rate_limit'){
     const key=body.p_bucket_key,limit=Number(body.p_limit),previous=state.rateBuckets.get(key)||0,count=previous+1;
@@ -511,6 +521,8 @@ test.beforeEach(() => {
   state.aiAbRuns = [{id:1,name:'approved test',model:'local-test',target_work_count:40,status:'promoted',min_pass_rate:.8,max_spoilers:0,min_preference_uplift:.05,created_at:'2026-10-01T00:00:00Z',promoted_at:'2026-10-02T00:00:00Z'}];
   state.aiAbItems = [];
   state.aiAbReviews = [];
+  state.cronRetentionRuns = [];
+  state.cronMetricPrunes = 0;
   state.rateBuckets.clear();
 });
 
@@ -646,13 +658,13 @@ test('deep health reports provider outages as warnings while core services stay 
   assert.equal('error' in data, false);
 });
 
-test('scheduled health requires a secret and alerts only after three consecutive warnings', async () => {
-  const monitorEnv={...env,HEALTH_MONITOR_TOKEN:'monitor-secret',HEALTH_ALERT_WEBHOOK_URL:'https://alerts.test/health'};
-  const denied=await worker.fetch(new Request('https://site.test/api/health/scheduled',{method:'POST'}),monitorEnv);
+test('Vercel Cron requires its bearer secret and runs health plus both retention jobs', async () => {
+  const monitorEnv={...env,CRON_SECRET:'cron-secret',HEALTH_ALERT_WEBHOOK_URL:'https://alerts.test/health'};
+  const denied=await worker.fetch(new Request('https://site.test/api/cron-health'),monitorEnv);
   assert.equal(denied.status,401);
   state.failProviders=true;
   for(let index=0;index<3;index++){
-    const result=await worker.fetch(new Request('https://site.test/api/health/scheduled',{method:'POST',headers:{authorization:'Bearer monitor-secret'}}),monitorEnv);
+    const result=await worker.fetch(new Request('https://site.test/api/cron-health',{headers:{authorization:'Bearer cron-secret'}}),monitorEnv);
     assert.equal(result.status,200);
   }
   assert.equal(state.healthChecks.length,3);
@@ -661,6 +673,12 @@ test('scheduled health requires a secret and alerts only after three consecutive
   assert.ok(state.healthAlerts[0].delivered_at);
   assert.equal(state.webhookCalls.length,1);
   assert.match(state.webhookCalls[0].text,/3회 연속/);
+  const retention=await worker.fetch(new Request('https://site.test/api/cron-retention',{headers:{authorization:'Bearer cron-secret'}}),monitorEnv);
+  assert.equal(retention.status,200);assert.equal(state.cronRetentionRuns.length,1);
+  const metrics=await worker.fetch(new Request('https://site.test/api/cron-recommendation-metrics',{headers:{authorization:'Bearer cron-secret'}}),monitorEnv);
+  assert.equal(metrics.status,200);assert.equal(state.cronMetricPrunes,1);
+  const wrongMethod=await worker.fetch(new Request('https://site.test/api/cron-retention',{method:'POST',headers:{authorization:'Bearer cron-secret'}}),monitorEnv);
+  assert.equal(wrongMethod.status,405);
 });
 
 test('API routing distinguishes missing paths and unsupported methods', async () => {

@@ -911,9 +911,5 @@ end $$;
 revoke all on function public.run_data_retention(timestamptz,integer) from public,anon,authenticated;
 grant execute on function public.run_data_retention(timestamptz,integer) to service_role;
 
-do $schedule$ declare v_job_id bigint;begin
-  for v_job_id in select jobid from cron.job where jobname='taste-constellation-data-retention' loop perform cron.unschedule(v_job_id);end loop;
-  perform cron.schedule('taste-constellation-data-retention','40 3 * * *',$job$select public.run_data_retention();$job$);
-  for v_job_id in select jobid from cron.job where jobname='taste-constellation-recommendation-metrics-retention' loop perform cron.unschedule(v_job_id);end loop;
-  perform cron.schedule('taste-constellation-recommendation-metrics-retention','15 4 * * *',$job$select public.prune_recommendation_metrics();$job$);
-end $schedule$;
+-- Application schedules are owned by Vercel Cron. Fresh database restores do
+-- not recreate the retired Supabase Cron jobs.
