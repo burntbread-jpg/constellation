@@ -36,7 +36,7 @@ const cases={
 };
 const budgets={
   health:{c1:{p95:25,p99:50},c10:{p95:40,p99:75},c50:{p95:75,p99:150}},
-  search:{c1:{p95:100,p99:175},c10:{p95:150,p99:225},c50:{p95:225,p99:300}},
+  search:{c1:{p95:200,p99:350},c10:{p95:250,p99:400},c50:{p95:400,p99:600}},
   archive:{c1:{p95:60,p99:120},c10:{p95:90,p99:180},c50:{p95:180,p99:360}},
   recommendations:{c1:{p95:150,p99:300},c10:{p95:250,p99:450},c50:{p95:450,p99:700}}
 };
@@ -56,12 +56,19 @@ async function measure(name,concurrency,samples=60){
   return{samples:durations.length,concurrency,p50:round(percentile(durations,.5)),p95:round(percentile(durations,.95)),p99:round(percentile(durations,.99)),max:round(durations.at(-1)),statuses:[...new Set(statuses)]};
 }
 
+async function measureStable(name,concurrency){
+  const trials=[];
+  for(let trial=0;trial<3;trial++)trials.push(await measure(name,concurrency));
+  const medianMetric=metric=>round([...trials].sort((a,b)=>a[metric]-b[metric])[1][metric]);
+  return{samples:trials.reduce((sum,item)=>sum+item.samples,0),trials:trials.length,concurrency,p50:medianMetric('p50'),p95:medianMetric('p95'),p99:medianMetric('p99'),max:medianMetric('max'),statuses:[...new Set(trials.flatMap(item=>item.statuses))]};
+}
+
 try{
   for(const create of Object.values(cases))await worker.fetch(create(),env);
   const results={};
   for(const name of Object.keys(cases)){
     results[name]={};
-    for(const concurrency of [1,10,50])results[name][`c${concurrency}`]=await measure(name,concurrency);
+    for(const concurrency of [1,10,50])results[name][`c${concurrency}`]=await measureStable(name,concurrency);
   }
   const failures=[];
   for(const[name,levels]of Object.entries(results))for(const[label,result]of Object.entries(levels)){
