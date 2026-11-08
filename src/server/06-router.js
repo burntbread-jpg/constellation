@@ -8,6 +8,22 @@ const SECURITY_HEADERS={
 const RATE_BUCKETS=new Map;
 const API_HEALTH_METRICS={windowMs:300000,events:[]};
 
+async function verifiedIdentityRequest(request,env){
+  const headers=new Headers(request.headers),legacyId=headers.get('oai-authenticated-user-id'),legacyEmail=headers.get('oai-authenticated-user-email');
+  headers.delete('oai-authenticated-user-id');headers.delete('oai-authenticated-user-email');
+  const authorization=headers.get('authorization')||'',token=authorization.match(/^Bearer\s+(.+)$/i)?.[1];
+  if(token&&env.SUPABASE_URL&&env.SUPABASE_PUBLISHABLE_KEY){
+    try{
+      const response=await timedFetch(`${env.SUPABASE_URL}/auth/v1/user`,{headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,authorization:`Bearer ${token}`,accept:'application/json'}},5000);
+      if(response.ok){const user=await response.json();if(/^[0-9a-f-]{36}$/i.test(String(user.id||''))){headers.set('oai-authenticated-user-id',user.id);if(user.email)headers.set('oai-authenticated-user-email',String(user.email).slice(0,320))}}
+    }catch(error){console.error('Supabase Auth verification unavailable',{message:error instanceof Error?error.message:String(error)})}
+  }else if(env.TRUST_SITES_IDENTITY_HEADERS==='true'){
+    if(legacyId)headers.set('oai-authenticated-user-id',legacyId);
+    if(legacyEmail)headers.set('oai-authenticated-user-email',legacyEmail);
+  }
+  return new Request(request,{headers});
+}
+
 function recordApiHealth(status,durationMs){
   const now=Date.now();
   API_HEALTH_METRICS.events.push({at:now,error:status>=500,slow:durationMs>=2000});
@@ -248,6 +264,8 @@ async function scheduledHealth(request,env){
 
 async function routeApi(request,env,url){
   const {pathname}=url;
+  if(pathname==='/api/auth/config')return request.method==='GET'?json({supabaseUrl:env.SUPABASE_URL||'',publishableKey:env.SUPABASE_PUBLISHABLE_KEY||'',method:'magic-link'},env.SUPABASE_URL&&env.SUPABASE_PUBLISHABLE_KEY?200:503,{'cache-control':'public, max-age=300'}):methodNotAllowed(['GET']);
+  if(pathname==='/api/auth/session'){if(request.method!=='GET')return methodNotAllowed(['GET']);const user=await currentUser(request);return user?json({user:{id:user.id,email:user.email}}):json({error:'로그인이 필요합니다.'},401)}
   if(pathname==='/api/search')return request.method==='GET'?publicMetadata(await search(request,env),300):methodNotAllowed(['GET']);
   if(pathname==='/api/artwork')return request.method==='GET'?publicMetadata(await resilientArtwork(request,env),86400):methodNotAllowed(['GET']);
   if(pathname==='/api/cultural-context')return request.method==='GET'?publicMetadata(await culturalContext(request),86400):methodNotAllowed(['GET']);
@@ -298,7 +316,7 @@ async function routeApi(request,env,url){
         supabase:dbReady(env),culturalContext:'wikidata-authority-catalog-v2',publisherEngine:'korean-editions-v1',
         editorialEngine:'curated-metadata-editorial-v2',aiAssist:localAiConfig(env).enabled?'local-zero-cost':'deterministic-fallback',artworkEngine:'official-artwork-ranking-v2',
         awardCatalog:{literature:10,film:12,animation:7},tasteEngine:'taste-profile-feedback-v2',
-        similarityEngine:'pgvector-cosine-v1',recommendationEngine:'pgvector-catalog-feedback-v1',
+        similarityEngine:'pgvector-cosine-v1',recommendationEngine:'pgvector-catalog-feedback-v1',auth:env.SUPABASE_PUBLISHABLE_KEY?'supabase-bearer-v1':'unconfigured',
         archiveEngine:'archive-management-v1',catalogDimensions:LEXICON.length
       }
     });
@@ -311,6 +329,7 @@ export default{
     const startedAt=performance.now(),id=requestId(request);
     try{
       const url=new URL(request.url);
+      if(url.pathname.startsWith('/api/'))request=await verifiedIdentityRequest(request,env);
       const limited=url.pathname.startsWith('/api/')?await rateLimit(request,env,url):null;
       const rejected=url.pathname.startsWith('/api/')?(limited?.response||validateMutation(request,url)):null;
       const response=url.pathname.startsWith('/api/')

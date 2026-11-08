@@ -6,6 +6,7 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
 export const bundles = {
   client: [
+    'src/client/00-auth.js',
     'src/client/01-core.js',
     'src/client/02-recommendations.js',
     'src/client/03-archive.js',

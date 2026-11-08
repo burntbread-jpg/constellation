@@ -29,6 +29,8 @@ $('#duplicateCandidateList').onclick=e=>{const exception=e.target.closest('[data
 $('#identityExceptionList').onclick=e=>{const button=e.target.closest('[data-identity-exception-remove]');if(button)removeIdentityException(button.dataset.identityExceptionRemove,button)};
 $('#duplicatePreviewBody').onchange=e=>{if(e.target.matches('[data-duplicate-confirm]'))$('#duplicatePreviewBody [data-duplicate-merge]').disabled=!e.target.checked};$('#duplicatePreviewBody').onclick=e=>{const button=e.target.closest('[data-duplicate-merge]');if(button)submitDuplicateMerge(button)};
 $('#metadataQualitySearch').oninput=renderMetadataQuality;$('#metadataQualityMedia').onchange=renderMetadataQuality;$('#metadataQualityField').onchange=renderMetadataQuality;$('#metadataQualitySort').onchange=renderMetadataQuality;
-$('#archiveCount').textContent='…';renderWork();loadArchive();
+$('#authButton').onclick=openAuthDialog;
+$('#authForm').onsubmit=async event=>{event.preventDefault();const email=$('#authEmail').value.trim(),button=$('#authForm button[type="submit"]');button.disabled=true;$('#authMessage').textContent='로그인 링크를 보내고 있어요…';try{await requestMagicLink(email);$('#authMessage').textContent='메일함에서 로그인 링크를 눌러 주세요. 이 창은 닫아도 됩니다.';toast('로그인 링크를 보냈습니다.')}catch(error){$('#authMessage').textContent=error.message}finally{button.disabled=false}};
+$('#archiveCount').textContent='…';renderWork();initializeAuth().finally(loadArchive);
 loadMetadataReviewQueue();
 enableAppShell();

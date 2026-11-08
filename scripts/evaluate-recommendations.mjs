@@ -60,7 +60,7 @@ export async function evaluateRecommendations({write = false} = {}) {
           method: 'POST',
           headers: {'content-type': 'application/json', 'oai-authenticated-user-id': `quality-${source.id}-${mode}`},
           body: JSON.stringify({work: source, mode})
-        }), {});
+        }), {TRUST_SITES_IDENTITY_HEADERS: 'true'});
         const data = await response.json();
         if (!response.ok) throw new Error(`${source.title}/${mode}: ${data.error || response.status}`);
         const items = data.items || [];

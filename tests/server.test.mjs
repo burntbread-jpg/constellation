@@ -13,7 +13,8 @@ const headers = {
 };
 const env = {
   SUPABASE_URL: 'https://mock.supabase.test',
-  SUPABASE_SERVICE_ROLE_KEY: 'test-only-key'
+  SUPABASE_SERVICE_ROLE_KEY: 'test-only-key',
+  TRUST_SITES_IDENTITY_HEADERS: 'true'
 };
 
 const state = {
@@ -70,6 +71,7 @@ function catalogVector(entries = {}) {
 
 function mockSupabase(url, init = {}) {
   const parsed = new URL(url);
+  if(parsed.pathname==='/auth/v1/user')return init.headers?.authorization==='Bearer valid-test-token'?response({id:userId,email:'reader@example.com'}):response({message:'invalid token'},401);
   const table = parsed.pathname.split('/').at(-1);
   const method = init.method || 'GET';
   const body = init.body ? JSON.parse(init.body) : null;
@@ -539,6 +541,15 @@ test('health reports free providers and configured persistence', async () => {
   assert.equal(data.sources.recommendationEngine, 'pgvector-catalog-feedback-v1');
   assert.equal(data.sources.archiveEngine, 'archive-management-v1');
   assert.equal(data.sources.catalogDimensions, 25);
+  const configResponse=await worker.fetch(new Request('https://site.test/api/auth/config'),{...env,SUPABASE_PUBLISHABLE_KEY:'sb_publishable_test'}),config=await configResponse.json();
+  assert.equal(configResponse.status,200);assert.equal(config.publishableKey,'sb_publishable_test');assert.equal(config.supabaseUrl,env.SUPABASE_URL);assert.equal(JSON.stringify(config).includes(env.SUPABASE_SERVICE_ROLE_KEY),false);
+  const secureEnv={...env,SUPABASE_PUBLISHABLE_KEY:'sb_publishable_test',TRUST_SITES_IDENTITY_HEADERS:'false'};
+  const spoofed=await worker.fetch(new Request('https://site.test/api/archive',{headers}),secureEnv);
+  assert.equal(spoofed.status,401);
+  const verified=await worker.fetch(new Request('https://site.test/api/archive',{headers:{authorization:'Bearer valid-test-token'}}),secureEnv);
+  assert.equal(verified.status,200);assert.deepEqual((await verified.json()).items,[]);
+  const session=await worker.fetch(new Request('https://site.test/api/auth/session',{headers:{authorization:'Bearer valid-test-token'}}),secureEnv);
+  assert.equal(session.status,200);assert.deepEqual((await session.json()).user,{id:userId,email:'reader@example.com'});
 });
 
 test('deep health verifies Supabase and pgvector without exposing it publicly', async () => {
