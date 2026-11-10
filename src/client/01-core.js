@@ -10,7 +10,7 @@ const recs={
 };
 let current='evangelion', mode='deep';
 let searchTimer=0, searchController=null, recommendationController=null, recommendationCache=new Map, culturalContextCache=new Map, publisherCache=new Map, editorialCache=new Map, artworkCache=new Map, metadataProvenanceCache=new Map;
-let archive=[], archiveReady=false, archiveError='', tasteProfile={tags:[],statement:''}, similarityEdges=[], connectionGraph=[], constellationGraph=null, graphFilter='all', archiveQuery='', archiveType='all', archiveState='all', archiveSort='updated', selectedRating=5, toastTimer=0;
+let archive=[], archiveReady=false, archiveError='', tasteProfile={tags:[],statement:''}, similarityEdges=[], connectionGraph=[], constellationGraph=null, graphFilter='all', archiveQuery='', archiveType='all', archiveState='all', archiveSort='updated', selectedRating=5, toastTimer=0, pendingArchiveRestore=null, archiveRestoreInFlight=false;
 let installPrompt=null;
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const esc=value=>String(value??'').replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
