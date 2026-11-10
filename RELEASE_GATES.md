@@ -7,7 +7,7 @@
 | 1 | Vercel용 Supabase Auth | 운영 로그인 UI·Supabase Bearer 검증·위조 헤더 차단·운영 URL 설정 확인 | 완료 |
 | 2 | CI 121/121 및 전체 Actions 녹색 | 로컬 121/121, 기본 브랜치의 필수 Actions 전부 성공 | 완료 |
 | 3 | Supabase Cron을 Vercel로 이전 | Vercel Cron 실행·인증·로그, Supabase의 기존 Sites 호출 제거 | 완료 |
-| 4 | 운영 로그인 E2E | PC·모바일에서 로그인→검색→저장→성좌→추천→삭제·복원 성공 | 대기 |
+| 4 | 운영 로그인 E2E | PC·모바일에서 로그인→검색→저장→성좌→추천→삭제·복원 성공 | 완료 |
 | 5 | 카탈로그·포스터 100작품 검수 | 100작품의 제목·매체·연도·창작자·포스터·소개 완성률 98% 이상 | 대기 |
 | 6 | 40작품 사람 A/B 검수 | 작품당 2인 독립 평가, AI 통과율 80%+, 스포일러 0, 선호도 +5%p | 대기 |
 | 7 | 실트래픽 성능·모바일 실기기 | 운영 p95 기준선과 iPhone Safari·Android Chrome 수동 검수 통과 | 대기 |
@@ -29,3 +29,13 @@
 - Production의 Supabase 서비스 역할 키를 현재 프로젝트 키로 교정한 뒤 재배포했다. 비밀값은 저장소와 문서에 기록하지 않았다.
 - 마이그레이션 `migrate_cron_to_vercel`을 운영 DB에 적용했고, 이전 Supabase `pg_cron` 작업 3개가 더 이상 존재하지 않음을 조회로 확인했다.
 - 마이그레이션 후 Supabase Security·Health advisor는 경고 0건이다. Performance advisor의 기존 미사용 인덱스 INFO 10건만 남아 있으며 이 이전 작업의 차단 사유는 아니다.
+
+## 단계 4 완료 증거 (2026-11-10)
+
+- 운영 도메인 `constellation-swart.vercel.app`에서 `yungoobae@gmail.com` 계정의 Supabase 로그인과 세션 유지를 확인했다.
+- PC 흐름에서 `기생충` 검색·작품 식별·별점과 임시 감상 저장·내 성좌 표시·Connection Mode 추천 이동을 확인했다.
+- Vercel의 중첩 아카이브 경로 누락을 `api/archive/[id].js`로 교정했다. 운영 DELETE 경로가 더 이상 HTML 404가 아니라 인증된 JSON API로 동작한다.
+- 운영에서 기록 삭제 후 `실행 취소` 복원을 재시험해 `작품을 다시 성좌에 복원했어요.` 상태, `내 성좌 1`, 복원된 작품 카드를 확인했다.
+- 390×844 모바일 뷰포트에서 로그인 상태·`기생충` 검색 결과의 정확한 FILM/2019 식별·Connection Mode 이동·내 성좌와 저장 카드 표시를 확인했다.
+- 회귀 검증은 단위·통합 122/122와 Playwright 데스크톱·모바일 10/10을 통과했다.
+- 운영 배포 `6hFGP8XY9TNtoJ7j85w8RSU7VRz1`이 커밋 `f11e9df`를 Production Current로 제공한다.
