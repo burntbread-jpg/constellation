@@ -15,3 +15,10 @@ test('Vercel serves the built client and deploys the Worker API adapter', async 
   assert.equal(body.ok, true);
   assert.equal(body.runtime, 'production-hardening-v1');
 });
+
+test('Vercel exposes archive item mutations through an explicit nested route', async () => {
+  const archiveItemApi = await import(new URL('../api/archive/[id].js', import.meta.url));
+
+  assert.equal(typeof archiveItemApi.PATCH, 'function');
+  assert.equal(typeof archiveItemApi.DELETE, 'function');
+});
