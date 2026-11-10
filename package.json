@@ -10,6 +10,7 @@
     "audit:dependencies": "pnpm audit --audit-level high",
     "check": "npm run build && npm test",
     "eval:recommendations": "node scripts/evaluate-recommendations.mjs --write",
+    "audit:catalog": "node scripts/review-catalog-100.mjs --resume",
     "perf:baseline": "node scripts/performance-baseline.mjs",
     "perf:baseline:write": "node scripts/performance-baseline.mjs --write",
     "backup:export": "node scripts/export-supabase-backup.mjs",
