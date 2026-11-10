@@ -19,7 +19,7 @@
 
 ## Method
 
-The fixed manifest records title, medium, original release year, creator and a human-written spoiler-safe introduction. Film posters use explicit TMDB work IDs; anime uses the AniList/TMDB/Wikipedia fallback chain; manga uses an exact-title AniList series identity; books use title-and-author matching with Korean-edition cover preference. Every selected image URL is requested and must return an image content type before the gate passes.
+The fixed manifest records title, medium, original release year, creator and a editorially reviewed spoiler-safe introduction. Film posters use explicit TMDB work IDs; anime uses the AniList/TMDB/Wikipedia fallback chain; manga uses an exact-title AniList series identity; books use title-and-author matching with Korean-edition cover preference. Every selected image URL is requested and must return an image content type before the gate passes.
 
 ## Exceptions
 

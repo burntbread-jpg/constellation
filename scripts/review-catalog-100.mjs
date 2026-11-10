@@ -224,7 +224,7 @@ function migrationSql(items) {
     id:`reviewed:${item.mediaType.toLowerCase()}:${slug(item.title)}`, external_id:item.externalId,
     title:item.title, creator:item.creator, release_year:item.year, media_type:item.mediaType,
     poster_url:item.posterUrl, description:item.description, editorial_intro:item.intro,
-    source:`Human review · ${item.artworkSource}`, canonical_key:item.canonicalKey,
+    source:`Editorial review · ${item.artworkSource}`, canonical_key:item.canonicalKey,
     evidence_url:item.evidenceUrl
   }));
   return `-- Stage 5: fixed 100-work human-reviewed catalog.\n-- Evidence source: quality/catalog-review-100.json and quality/reports/catalog-review-100.json\nwith incoming as (\n  select * from jsonb_to_recordset(${sqlLiteralJson(payload)}) as x(\n    id text, external_id text, title text, creator text, release_year integer, media_type text,\n    poster_url text, description text, editorial_intro text, source text, canonical_key text, evidence_url text\n  )\n), resolved as (\n  select coalesce((\n    select w.id from public.works w\n    where upper(w.media_type)=i.media_type\n      and w.release_year=i.release_year\n      and regexp_replace(lower(w.title),'[^a-z0-9가-힣]+','','g')=regexp_replace(lower(i.title),'[^a-z0-9가-힣]+','','g')\n    order by (w.catalog_status in ('verified','curated')) desc, w.created_at asc limit 1\n  ), i.id) id, i.* from incoming i\n)\ninsert into public.works (\n  id,external_id,title,creator,release_year,media_type,poster_url,description,editorial_intro,source,canonical_key,\n  catalog_status,metadata_verified_at,edition_verified,tags\n)\nselect id,external_id,title,creator,release_year,media_type,poster_url,description,editorial_intro,source,canonical_key,\n       'verified',now(),media_type in ('BOOK','MANGA'),'[]'::jsonb\nfrom resolved\non conflict (id) do update set\n  external_id=coalesce(excluded.external_id,public.works.external_id), title=excluded.title, creator=excluded.creator,\n  release_year=excluded.release_year, media_type=excluded.media_type, poster_url=excluded.poster_url,\n  description=excluded.description, editorial_intro=excluded.editorial_intro, source=excluded.source,\n  canonical_key=excluded.canonical_key, catalog_status='verified', metadata_verified_at=now(),\n  edition_verified=excluded.edition_verified, updated_at=now();\n\n-- Keep duplicates for audit history, but remove them from recommendation eligibility.\nupdate public.works candidate\nset catalog_status='quarantined', updated_at=now()\nwhere candidate.catalog_status='candidate'\n  and exists (\n    select 1 from public.works verified\n    where verified.catalog_status='verified'\n      and verified.id<>candidate.id\n      and verified.canonical_key=candidate.canonical_key\n  );\n`;
@@ -237,6 +237,7 @@ function reportMarkdown(auditResult, items) {
 
 function migrationSqlBatch(items) {
   return migrationSql(items)
+    .replace('human-reviewed catalog', 'editorially reviewed catalog')
     .replace('), i.id) id, i.*', '), i.id) resolved_id, i.*')
     .replace('select id,external_id,title,creator', 'select resolved_id,external_id,title,creator');
 }
@@ -272,7 +273,7 @@ console.log(JSON.stringify(auditResult, null, 2));
 
 if (write) {
   await fs.writeFile(reportJsonPath, `${JSON.stringify({generatedAt:new Date().toISOString(),origin:productionOrigin,audit:auditResult,items:resolved}, null, 2)}\n`);
-  await fs.writeFile(reportMarkdownPath, reportMarkdown(auditResult, resolved));
+  await fs.writeFile(reportMarkdownPath, reportMarkdown(auditResult, resolved).replace('human-written spoiler-safe introduction', 'editorially reviewed spoiler-safe introduction'));
   if (!auditResult.unresolved.length && !auditResult.unreachablePosters.length && auditResult.minimumCompletion >= 98 && !auditResult.duplicateIdentityCount) {
     const halves = [resolved.slice(0, 50), resolved.slice(50)];
     for (let index = 0; index < migrationPaths.length; index++) {
