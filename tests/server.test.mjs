@@ -921,13 +921,24 @@ test('optional AI status is reviewer-only and blocks metered providers', async (
   assert.equal(data.guardrails.deterministicFallback,true);
 });
 
+test('A/B generation refuses an unconfigured model without consuming candidates', async () => {
+  state.aiAbRuns=[];state.aiAbItems=[];state.aiAbReviews=[];
+  const reviewerId='73737373-7373-4373-8373-737373737374',reviewerHeaders={'oai-authenticated-user-id':reviewerId,'content-type':'application/json'},reviewerEnv={...env,METADATA_REVIEWER_IDS:reviewerId};
+  const started=await worker.fetch(new Request('https://site.test/api/ai-editorial-ab',{method:'POST',headers:reviewerHeaders,body:JSON.stringify({action:'start'})}),reviewerEnv);
+  assert.equal(started.status,201);
+  const generated=await worker.fetch(new Request('https://site.test/api/ai-editorial-ab',{method:'POST',headers:reviewerHeaders,body:JSON.stringify({action:'generate'})}),reviewerEnv),data=await generated.json();
+  assert.equal(generated.status,409);assert.equal(data.reason,'disabled');assert.match(data.error,/무료 AI 모델/);
+  assert.equal(state.aiAbItems.filter(item=>item.candidate_outcome!=='pending').length,0);
+});
+
 test('40-work blinded human review requires two independent reviewers and agreement before promotion', async () => {
   state.aiAbRuns=[];state.aiAbItems=[];state.aiAbReviews=[];
   const reviewerId='74747474-7474-4474-8474-747474747474',secondReviewerId='75757575-7575-4575-8575-757575757575',reviewerHeaders={'oai-authenticated-user-id':reviewerId,'content-type':'application/json'},secondHeaders={'oai-authenticated-user-id':secondReviewerId,'content-type':'application/json'},reviewerEnv={...env,METADATA_REVIEWER_IDS:`${reviewerId},${secondReviewerId}`,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-ab',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions',LOCAL_AI_DAILY_LIMIT:'50',LOCAL_AI_HOURLY_PER_USER_LIMIT:'10'};
   const started=await worker.fetch(new Request('https://site.test/api/ai-editorial-ab',{method:'POST',headers:reviewerHeaders,body:JSON.stringify({action:'start'})}),reviewerEnv),startData=await started.json();
   assert.equal(started.status,201);assert.equal(startData.metrics.target,40);assert.equal(state.aiAbItems.length,40);
-  const generated=await worker.fetch(new Request('https://site.test/api/ai-editorial-ab',{method:'POST',headers:reviewerHeaders,body:JSON.stringify({action:'generate'})}),reviewerEnv);
-  assert.equal(generated.status,200);assert.equal(state.aiAbItems.filter(item=>item.candidate_outcome!=='pending').length,5);
+  state.aiAbItems[0].candidate_outcome='unavailable';state.aiAbItems[1].candidate_outcome='config_disabled';
+  const generated=await worker.fetch(new Request('https://site.test/api/ai-editorial-ab',{method:'POST',headers:reviewerHeaders,body:JSON.stringify({action:'generate'})}),reviewerEnv),generatedData=await generated.json();
+  assert.equal(generated.status,200);assert.equal(generatedData.lastGeneration.accepted,5);assert.equal(generatedData.metrics.generated,5);assert.equal(state.aiAbItems.filter(item=>item.candidate_text).length,5);assert.equal(state.aiAbRuns[0].model,'local-ab');
   for(const item of state.aiAbItems){Object.assign(item,{candidate_text:'창문 하나로 잃어버린 기억과 남은 마음의 거리를 재어 보는 작품.',candidate_outcome:'accepted',machine_pass:true,generated_at:new Date().toISOString()})}
   state.aiAbReviews=state.aiAbItems.map((item,index)=>({id:index+1,item_id:item.id,reviewer_id:reviewerId,quality_pass:true,spoiler:false,preference:'candidate',control_score:3,candidate_score:5,updated_at:new Date().toISOString()}));
   const beforeSecond=await worker.fetch(new Request('https://site.test/api/ai-editorial-ab',{headers:{'oai-authenticated-user-id':reviewerId}}),reviewerEnv),beforeData=await beforeSecond.json();
