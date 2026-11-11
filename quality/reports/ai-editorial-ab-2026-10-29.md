@@ -47,7 +47,7 @@ Manual rubric average for raw Variant B: **53/100**.
 
 Keep Qwen enabled as an optional, zero-cost assistant behind the deterministic quality gate. Do not treat it as the primary editorial writer yet. Promotion requires:
 
-- at least 30 reviewed works across film, literature, manga, and anime;
+- all 40 fixed works reviewed across film, literature, manga, and anime;
 - at least 80% valid single-sentence responses;
 - zero material spoilers;
 - Variant B beating Variant A by at least 5 points on the fixed rubric;

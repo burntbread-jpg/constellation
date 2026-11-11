@@ -11,6 +11,12 @@ test('client deployment artifact matches the modular source', async () => {
   assert.equal(normalize(deployed), normalize(generated));
 });
 
+test('AI editorial review artifact matches its lazy-loaded source', async () => {
+  const generated = await compose(bundles.review);
+  const deployed = await readFile(new URL('../dist/client/ai-ab.js', import.meta.url), 'utf8');
+  assert.equal(normalize(deployed), normalize(generated));
+});
+
 test('server deployment artifact matches the modular source', async () => {
   const generated = await compose(bundles.server);
   const deployed = await readFile(new URL('../dist/server/index.js', import.meta.url), 'utf8');
@@ -514,13 +520,21 @@ test('stage 72 recommendation metrics are aggregate-only, private, retained, and
 test('AI editorial default activation requires a private 40-work blinded human A/B gate',async()=>{
   const migration=await readFile(new URL('../supabase/migrations/20261029044823_ai_editorial_human_ab.sql',import.meta.url),'utf8');
   const consensusMigration=await readFile(new URL('../supabase/migrations/20261029135952_ai_editorial_ab_consensus.sql',import.meta.url),'utf8');
+  const variantVerdictsMigration=await readFile(new URL('../supabase/migrations/20261111090824_ai_editorial_ab_variant_verdicts.sql',import.meta.url),'utf8');
   const server=await readFile(new URL('../src/server/03-taste-engine.js',import.meta.url),'utf8');
+  const client=await readFile(new URL('../src/client/01-core.js',import.meta.url),'utf8');
+  const aiAbClient=await readFile(new URL('../src/client/05-ai-ab.js',import.meta.url),'utf8');
   const html=await readFile(new URL('../dist/client/index.html',import.meta.url),'utf8');
+  const aiAbCss=await readFile(new URL('../dist/client/ai-ab.css',import.meta.url),'utf8');
   const favicon=await readFile(new URL('../dist/client/favicon.ico',import.meta.url));
   assert.match(migration,/target_work_count between 30 and 50/);assert.match(migration,/default 0\.80/);assert.match(migration,/default 0\.05/);assert.match(migration,/max_spoilers integer not null default 0/);
   assert.match(migration,/enable row level security/);assert.match(migration,/revoke all on public\.ai_editorial_ab_reviews from anon, authenticated/);
   assert.match(consensusMigration,/min_reviews_per_work smallint not null default 2/);assert.match(consensusMigration,/min_agreement_rate numeric\(5,4\) not null default 0\.70/);
+  assert.match(variantVerdictsMigration,/control_quality_pass boolean/);assert.match(variantVerdictsMigration,/candidate_quality_pass boolean/);assert.match(variantVerdictsMigration,/control_spoiler boolean/);assert.match(variantVerdictsMigration,/candidate_spoiler boolean/);
   assert.match(server,/const AI_EDITORIAL_AB_SAMPLE=/);assert.equal((server.match(/\['(?:ANIME|FILM|BOOK|MANGA)'/g)||[]).length,40);
-  assert.match(server,/generated>=30/);assert.match(server,/eligible\.length>=30/);assert.match(server,/reviewers\.size>=2/);assert.match(server,/agreementRate>=minAgreement/);assert.match(server,/passRate>=Number\(run\.min_pass_rate/);assert.match(server,/preferenceUplift>=Number\(run\.min_preference_uplift/);
-  assert.match(html,/aiEditorialAbSummary/);assert.match(html,/href="favicon\.ico"/);assert.ok(favicon.length>100);
+  assert.match(server,/target===AI_EDITORIAL_AB_SAMPLE\.length&&generated>=target/);assert.match(server,/eligible\.length>=target/);assert.match(server,/reviewers\.size>=2/);assert.match(server,/agreementRate>=minAgreement/);assert.match(server,/passRate>=Number\(run\.min_pass_rate/);assert.match(server,/preferenceUplift>=Number\(run\.min_preference_uplift/);
+  assert.doesNotMatch(server,/candidateFirst}}/);assert.match(server,/control_quality_pass:controlQualityPass/);assert.match(server,/candidate_spoiler:candidateSpoiler/);
+  assert.match(client,/loadAiEditorialAbModule/);assert.match(client,/ai-ab\.js\?v=1/);
+  assert.match(aiAbClient,/data-ai-ab-work-select/);assert.match(aiAbClient,/data-ai-ab-skip/);assert.match(aiAbClient,/건너뛴 작품은 평가 결과에 포함되지 않습니다/);assert.match(aiAbClient,/chooseAiEditorialAbWork/);assert.match(aiAbClient,/skipAiEditorialAbWork/);
+  assert.match(html,/aiEditorialAbSummary/);assert.match(html,/ai-ab\.css\?v=1/);assert.match(aiAbCss,/ai-ab-work-picker/);assert.match(html,/href="favicon\.ico"/);assert.ok(favicon.length>100);
 });

@@ -12,6 +12,9 @@ export const bundles = {
     'src/client/03-archive.js',
     'src/client/04-events.js'
   ],
+  review: [
+    'src/client/05-ai-ab.js'
+  ],
   server: [
     'src/server/01-providers.js',
     'src/server/02-storage.js',
@@ -32,6 +35,7 @@ async function build() {
   await mkdir(join(root, 'dist/client'), {recursive: true});
   await mkdir(join(root, 'dist/server'), {recursive: true});
   await writeFile(join(root, 'dist/client/app.js'), await compose(bundles.client));
+  await writeFile(join(root, 'dist/client/ai-ab.js'), await compose(bundles.review));
   await writeFile(join(root, 'dist/server/index.js'), await compose(bundles.server));
 
   // Sites serves root assets while local previews use dist/client. Keep both views in sync.

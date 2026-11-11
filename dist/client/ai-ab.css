@@ -1,0 +1,11 @@
+.ai-ab-work-picker{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px 14px;padding:12px;border:1px solid #3c3956;border-radius:8px;background:#181823}
+.ai-ab-work-picker label{display:grid;gap:6px;color:#bfc1c8;font-size:10px}
+.ai-ab-work-picker select{width:100%;padding:9px;border:1px solid #45485c;border-radius:6px;background:#0f1117;color:var(--ink);font:11px 'Noto Sans KR'}
+.ai-ab-work-picker>span,.ai-ab-review-help{color:var(--muted);font-size:10px}
+.ai-ab-variants .danger{color:#e5aa9c}
+.ai-ab-review-actions{display:flex;justify-content:space-between;gap:8px;margin-top:12px}
+.ai-ab-review-actions button,.ai-ab-all-skipped button{padding:8px 11px;border:1px solid #8c83d9;border-radius:6px;background:#25223b;color:#d7d2ff;font-weight:700;cursor:pointer}
+.ai-ab-review-actions [data-ai-ab-skip]{border-color:#45485c;background:#171923;color:#aeb0b9}
+.ai-ab-all-skipped{padding:18px;border:1px solid #34364d;border-radius:8px;background:#151720;text-align:center}
+.ai-ab-all-skipped p{color:var(--muted);font-size:11px;line-height:1.7}
+@media(max-width:620px){.ai-ab-work-picker{grid-template-columns:1fr}.ai-ab-review-actions{flex-direction:column}.ai-ab-review-actions button{width:100%}}
