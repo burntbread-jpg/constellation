@@ -156,6 +156,32 @@ test('keyboard search and responsive layout remain usable', async ({page, isMobi
   expect(overflow, `${isMobile ? 'mobile' : 'desktop'} viewport has horizontal overflow`).toBeLessThanOrEqual(1);
 });
 
+test('mobile header keeps the brand, navigation, and a long account email readable', async ({page, isMobile}) => {
+  test.skip(!isMobile, 'mobile-only header regression');
+  await page.locator('#authButton').evaluate((button) => {
+    button.hidden = false;
+    button.dataset.signedIn = 'true';
+    button.querySelector('#authLabel').textContent = 'yungoobae@gmail.com';
+  });
+
+  const layout = await page.evaluate(() => {
+    const box = selector => document.querySelector(selector).getBoundingClientRect();
+    const brand = box('.topbar .brand');
+    const account = box('.topbar > .auth-button');
+    const navigation = box('.topbar nav');
+    const label = box('.topbar .brand span:last-child');
+    return {
+      brand, account, navigation, label,
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth
+    };
+  });
+
+  expect(layout.brand.right).toBeLessThanOrEqual(layout.account.left + 1);
+  expect(Math.max(layout.brand.bottom, layout.account.bottom)).toBeLessThanOrEqual(layout.navigation.top + 1);
+  expect(layout.label.height).toBeLessThan(32);
+  expect(layout.overflow).toBeLessThanOrEqual(1);
+});
+
 test('primary screens meet WCAG A and AA without serious violations', async ({page}) => {
   await expectNoSeriousAccessibilityViolations(page, '탐색 화면');
 

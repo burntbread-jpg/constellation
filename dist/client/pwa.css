@@ -29,9 +29,21 @@
   background: rgba(211, 255, 69, .15);
 }
 
+.topbar{justify-content:flex-start;gap:.5rem}
+.topbar .brand{flex:0 0 auto;white-space:nowrap}
+.topbar nav{min-width:0;margin-left:auto;align-items:center}
+.topbar>.auth-button{flex:0 1 11rem;min-width:0}
+
 @media (max-width: 620px) {
+  .topbar{height:auto;min-height:7rem;display:grid;grid-template-columns:minmax(0,1fr) minmax(7.5rem,9.5rem);grid-template-areas:'brand account' 'navigation navigation';align-content:center;padding:max(.65rem,env(safe-area-inset-top)) 1rem .65rem;column-gap:.75rem;row-gap:.35rem}
+  .topbar .brand{grid-area:brand;justify-self:start}
+  .topbar nav{grid-area:navigation;width:100%;margin-left:0;justify-content:flex-start;gap:.25rem}
+  .topbar .nav-btn{min-height:2.5rem;padding:.55rem .75rem;white-space:nowrap}
+  .topbar>.auth-button{grid-area:account;width:100%;max-width:9.5rem;justify-self:end;padding-inline:.75rem}
+
   .install-app {
     width: 2.35rem;
+    flex: 0 0 2.35rem;
     padding: 0;
     overflow: hidden;
     color: transparent;
@@ -45,6 +57,12 @@
     color: #d3ff45;
     font-size: 1.1rem;
   }
+}
+
+@media (max-width: 360px) {
+  .topbar{grid-template-columns:minmax(0,1fr) 7.5rem;padding-inline:.75rem}
+  .topbar .brand{gap:.4rem;font-size:.95rem}
+  .topbar .nav-btn{padding-inline:.6rem}
 }
 
 @media (display-mode: standalone) {
