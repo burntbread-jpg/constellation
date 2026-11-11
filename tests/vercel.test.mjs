@@ -22,3 +22,20 @@ test('Vercel exposes archive item mutations through an explicit nested route', a
   assert.equal(typeof archiveItemApi.PATCH, 'function');
   assert.equal(typeof archiveItemApi.DELETE, 'function');
 });
+
+test('Vercel explicitly routes every nested operational API', async () => {
+  const routes = [
+    ['../api/ai-assist/status.js', ['GET']],
+    ['../api/health/deep.js', ['GET']],
+    ['../api/health/alerts/[id].js', ['PATCH']],
+    ['../api/duplicate-merges/[id].js', ['PATCH']],
+    ['../api/identity-exceptions/[id].js', ['DELETE']],
+    ['../api/metadata-changes/[id].js', ['PATCH']],
+    ['../api/metadata-reports/[id].js', ['PATCH']]
+  ];
+
+  for (const [path, methods] of routes) {
+    const api = await import(new URL(path, import.meta.url));
+    for (const method of methods) assert.equal(typeof api[method], 'function', `${path} must export ${method}`);
+  }
+});
