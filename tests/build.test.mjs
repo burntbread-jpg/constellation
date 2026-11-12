@@ -76,7 +76,7 @@ test('PWA shell and HTML request the same current client bundle', async () => {
   assert.ok(version);
   assert.match(worker, new RegExp(`app\\.js\\?v=${version}`));
   assert.match(worker, new RegExp(`taste-constellation-shell-v${version}`));
-  assert.match(html,/app\.js\?v=88/);assert.match(worker,/ai-ab\.js\?v=2/);
+  assert.match(html,/app\.js\?v=89/);assert.match(worker,/ai-ab\.js\?v=3/);
 });
 
 test('work details diagnose incomplete metadata and link each gap to a correction report', async () => {
@@ -535,9 +535,9 @@ test('AI editorial default activation requires a private 40-work personal blinde
   assert.match(variantVerdictsMigration,/control_quality_pass boolean/);assert.match(variantVerdictsMigration,/candidate_quality_pass boolean/);assert.match(variantVerdictsMigration,/control_spoiler boolean/);assert.match(variantVerdictsMigration,/candidate_spoiler boolean/);
   assert.match(personalMigration,/set default 1/);assert.match(personalMigration,/min_reviews_per_work = 1/);assert.match(personalMigration,/control_score between 1 and 3/);assert.match(personalMigration,/candidate_score between 1 and 3/);
   assert.match(server,/const AI_EDITORIAL_AB_SAMPLE=/);assert.equal((server.match(/\['(?:ANIME|FILM|BOOK|MANGA)'/g)||[]).length,40);
-  assert.match(server,/target===AI_EDITORIAL_AB_SAMPLE\.length&&generated>=target/);assert.match(server,/eligible\.length>=target/);assert.match(server,/personalReviews/);assert.match(server,/uniqueEditorialAbControl/);assert.match(server,/\[1,2,3\]\.includes\(scoreA\)/);assert.match(server,/passRate>=Number\(run\.min_pass_rate/);assert.match(server,/preferenceUplift>=Number\(run\.min_preference_uplift/);
+  assert.match(server,/target===AI_EDITORIAL_AB_SAMPLE\.length&&generated>=target/);assert.match(server,/eligible\.length>=target/);assert.match(server,/personalReviews/);assert.match(server,/uniqueEditorialAbControl/);assert.match(server,/\[1,2,3\]\.includes\(scoreA\)/);assert.match(server,/aiPassRate>=Number\(run\.min_pass_rate/);assert.match(server,/personalApproved/);assert.match(server,/preferenceUplift>=Number\(run\.min_preference_uplift/);
   assert.doesNotMatch(server,/candidateFirst}}/);assert.match(server,/control_quality_pass:controlQualityPass/);assert.match(server,/candidate_spoiler:candidateSpoiler/);
-  assert.match(client,/loadAiEditorialAbModule/);assert.match(client,/ai-ab\.js\?v=2/);
-  assert.match(aiAbClient,/data-ai-ab-work-select/);assert.match(aiAbClient,/data-ai-ab-skip/);assert.match(aiAbClient,/건너뛴 작품은 평가 결과에 포함되지 않습니다/);assert.match(aiAbClient,/chooseAiEditorialAbWork/);assert.match(aiAbClient,/skipAiEditorialAbWork/);assert.match(aiAbClient,/\[1,'부족함'\]/);assert.match(aiAbClient,/40작품·각 1회 검수/);
+  assert.match(client,/loadAiEditorialAbModule/);assert.match(client,/ai-ab\.js\?v=3/);
+  assert.match(aiAbClient,/data-ai-ab-work-select/);assert.match(aiAbClient,/data-ai-ab-skip/);assert.match(aiAbClient,/건너뛴 작품은 평가 결과에 포함되지 않습니다/);assert.match(aiAbClient,/chooseAiEditorialAbWork/);assert.match(aiAbClient,/skipAiEditorialAbWork/);assert.match(aiAbClient,/\[1,'부족함'\]/);assert.match(aiAbClient,/40작품·각 1회 검수/);assert.match(aiAbClient,/내 품질 통과율/);assert.match(aiAbClient,/AI 통과율/);
   assert.match(html,/aiEditorialAbSummary/);assert.match(html,/ai-ab\.css\?v=1/);assert.match(aiAbCss,/ai-ab-work-picker/);assert.match(html,/href="favicon\.ico"/);assert.ok(favicon.length>100);
 });
