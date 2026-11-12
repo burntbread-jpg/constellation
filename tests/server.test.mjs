@@ -400,7 +400,9 @@ test.before(() => {
       if(state.localAiMode==='error')return response({error:'unavailable'},503);
       const content=state.localAiMode==='invalid'
         ? JSON.stringify({intro:'생각하게 하는 작품.',tags:['허용되지 않은 태그']})
-        : JSON.stringify({intro:'닫힌 방의 창문 하나로 기억과 상실의 거리를 재어 보는 작품.',tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'공간과 경계',score:.76}]});
+        : state.localAiMode==='synopsis'
+          ? JSON.stringify({intro:'주인공이 여러 사건을 겪으며 자신의 정체성을 찾아간다. 작품.',tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'공간과 경계',score:.76}]})
+          : JSON.stringify({intro:'닫힌 방의 창문 하나로 기억과 상실의 거리를 재어 보는 작품.',tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'공간과 경계',score:.76}]});
       return response({choices:[{message:{content}}]});
     }
     if (url === 'https://alerts.test/health') {state.webhookCalls.push(JSON.parse(init.body));return response({ok:true});}
@@ -862,7 +864,7 @@ test('optional local AI accepts only zero-cost quality-gated public metadata', a
   const aiEnv={...env,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-test',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions'};
   const result=await worker.fetch(new Request('https://site.test/api/editorial-intro',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({work:{id:'book:ai-quality',title:'기억의 방',creator:'작가',mediaType:'BOOK',description:'닫힌 방에서 잃어버린 가족의 기억을 복원하는 소설',tags:['기억','상실']}})}),aiEnv),data=await result.json();
   assert.equal(result.status,200);
-  assert.equal(data.engine,'local-ai-editorial-v1');
+  assert.equal(data.engine,'local-ai-editorial-v2');
   assert.equal(data.cost,'free-local');
   assert.equal(data.guardrails.personalDataSent,false);
   assert.equal(data.guardrails.aiOutcome,'accepted');
@@ -882,6 +884,16 @@ test('optional local AI rejects unsafe output and preserves the deterministic fa
   assert.equal(data.guardrails.fallback,true);
   assert.equal(data.guardrails.aiOutcome,'quality_gate_rejected');
   assert.equal(typeof data.controlText,'string');
+});
+
+test('personal editorial gate rejects synopsis copy learned from the first 38 reviews', async () => {
+  state.localAiMode='synopsis';
+  const aiEnv={...env,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-synopsis',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions'};
+  const result=await worker.fetch(new Request('https://site.test/api/editorial-intro',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({work:{id:'film:synopsis',title:'경계의 방',creator:'감독',mediaType:'FILM',description:'닫힌 방에서 기억을 잃은 인물이 가족의 흔적을 찾는다',tags:['기억','상실']}})}),aiEnv),data=await result.json();
+  assert.equal(result.status,200);
+  assert.equal(data.engine,'metadata-editorial-v2');
+  assert.equal(data.guardrails.aiOutcome,'tags_only');
+  assert.equal(data.guardrails.fallback,true);
 });
 
 test('optional local AI enforces a distributed service daily cap and falls back safely', async () => {

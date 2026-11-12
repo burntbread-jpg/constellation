@@ -99,6 +99,9 @@ test('stage 73 keeps AI optional, zero-cost, private, and quality-gated', async 
   assert.match(engine,/AbortSignal\.timeout\(8000\)/);
   assert.match(engine,/\/no_think/);
   assert.match(engine,/max_tokens:480/);
+  assert.match(engine,/personal-editorial-v2-38/);
+  assert.match(engine,/38건의 블라인드 평가/);
+  assert.match(engine,/EDITORIAL_SYNOPSIS_PATTERN/);
   assert.match(engine,/replace\(\/<think>/);
   assert.match(engine,/validateLocalAiIntro/);
   assert.match(engine,/validateLocalAiTags/);
