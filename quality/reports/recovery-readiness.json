@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "migrationCount": 32,
+  "migrationCount": 40,
   "migrations": [
     {
       "name": "20261005_stage15_archive_management.sql",
@@ -161,9 +161,49 @@
       "name": "20261029135952_ai_editorial_ab_consensus.sql",
       "sha256": "52ac98aec6ec919b7825e2a7d473ec18002196143bf245396cdf5baa9a33e057",
       "bytes": 595
+    },
+    {
+      "name": "20261108140001_migrate_cron_to_vercel.sql",
+      "sha256": "bbda6d36f8112522d477167b23f836b7c139f4902fe478084ef960b7b1b72682",
+      "bytes": 617
+    },
+    {
+      "name": "20261110120000_stage5_catalog_review_100_a.sql",
+      "sha256": "8f14b97e7a5c962790c92009c966e46e37cd4bb328507ef94b3b16d2744a9f68",
+      "bytes": 40980
+    },
+    {
+      "name": "20261110120100_stage5_catalog_review_100_b.sql",
+      "sha256": "dfc86921c31f1557db69a6941900b0c6bbba9b44e4f235c69d6136859e387b49",
+      "bytes": 38277
+    },
+    {
+      "name": "20261110120200_stage5_preserve_explicit_quarantine.sql",
+      "sha256": "2bab66ed8f64b292f0260ecfdb0ed98d815fae6156890f069cb3e62b50d78c8a",
+      "bytes": 2077
+    },
+    {
+      "name": "20261110120300_stage5_correct_stalker_korean_title.sql",
+      "sha256": "73c93069271d39f5b90284c4b83199fd3a2b30c366cb4c1cc6d127ffcb5cbb0e",
+      "bytes": 213
+    },
+    {
+      "name": "20261110120400_stage5_correct_review_provenance.sql",
+      "sha256": "edeb217f8364097fa8337c5ea86bbab66a13824e40532887e2a10c24c4a5b8e1",
+      "bytes": 189
+    },
+    {
+      "name": "20261111090824_ai_editorial_ab_variant_verdicts.sql",
+      "sha256": "0c2f63bec29eed21069e6afe575e4d410deb849181b54bb75543bae1b3e67107",
+      "bytes": 1230
+    },
+    {
+      "name": "20261111153013_personalize_editorial_ab_review.sql",
+      "sha256": "0efdb6bb595326faf169a2b58919ed344ae118dce8f3ec7a2973d0baa4a22491",
+      "bytes": 1077
     }
   ],
-  "schemaSha256": "871346792d5eacf1f77a53682866ed5fa652004de9a83a62cf31fbfa9de0efa8",
+  "schemaSha256": "0339b69e5f6c716d5c543b5dc2f38e2ced7667847b949bd6bdf1038f5d881eb0",
   "requiredTables": [
     "profiles",
     "works",
