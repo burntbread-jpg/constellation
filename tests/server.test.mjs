@@ -398,16 +398,16 @@ test.before(() => {
     if (url === 'https://local-ai.test/v1/chat/completions') {
       const payload=JSON.parse(init.body);state.localAiCalls.push(payload);
       if(state.localAiMode==='error')return response({error:'unavailable'},503);
-      const promptPayload=JSON.parse(payload.messages.at(-1).content.replace(/^\/no_think\s*/,''));
+      const promptPayload=JSON.parse(payload.messages.find(message=>message.role==='user'&&message.content.startsWith('/no_think')).content.replace(/^\/no_think\s*/,'')),isDedupRetry=payload.messages.length>2;
       const content=state.localAiMode==='invalid'
         ? JSON.stringify({intro:'생각하게 하는 작품.',tags:['허용되지 않은 태그']})
         : state.localAiMode==='synopsis'
           ? JSON.stringify({intro:'주인공이 여러 사건을 겪으며 자신의 정체성을 찾아간다. 작품.',tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'공간과 경계',score:.76}]})
           : state.localAiMode==='spoiler'
             ? JSON.stringify({intro:'캠코더에 남긴 마지막 메시지가 아버지의 죽음을 미리 말하는 작품.',tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'가족',score:.76}]})
-            : state.localAiMode==='duplicate'
+            : state.localAiMode==='duplicate'||(state.localAiMode==='duplicateThenPreferred'&&!isDedupRetry)
               ? JSON.stringify({intro:promptPayload.controlText,tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'공간과 경계',score:.76}]})
-              : state.localAiMode==='preferred'
+              : state.localAiMode==='preferred'||state.localAiMode==='duplicateThenPreferred'
                 ? JSON.stringify({intro:'이름을 적는 순간 죽는 공책이 정의감을 죽이기 시작하는 작품.',tags:[{tag:'정의와 죄책감',score:.88},{tag:'권력과 통제',score:.84},{tag:'존재와 죽음',score:.76}]})
           : JSON.stringify({intro:'닫힌 방의 창문 하나로 기억과 상실의 거리를 재어 보는 작품.',tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'공간과 경계',score:.76}]});
       return response({choices:[{message:{content}}]});
@@ -910,7 +910,19 @@ test('personal editorial v3 accepts the concrete single-reversal pattern learned
   assert.equal(result.status,200);
   assert.equal(data.engine,'local-ai-editorial-v3');
   assert.equal(data.text,'이름을 적는 순간 죽는 공책이 정의감을 죽이기 시작하는 작품.');
-  assert.equal(data.guardrails.promptVersion,'personal-editorial-v3-80');
+  assert.equal(data.guardrails.promptVersion,'personal-editorial-v3-80-dedup');
+});
+
+test('personal editorial v3 retries copied control text once and keeps only a distinct replacement', async () => {
+  state.localAiMode='duplicateThenPreferred';
+  const aiEnv={...env,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-dedup-retry-v3',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions'};
+  const callsBefore=state.localAiCalls.length;
+  const result=await worker.fetch(new Request('https://site.test/api/editorial-intro',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({work:{id:'book:dedup-retry-v3',title:'심판의 공책',creator:'작가',mediaType:'BOOK',description:'이름을 적으면 사람이 죽는 공책을 얻은 학생이 정의를 실행하려 한다',tags:['정의와 죄책감','권력과 통제']}})}),aiEnv),data=await result.json();
+  assert.equal(result.status,200);
+  assert.equal(state.localAiCalls.length-callsBefore,2);
+  assert.equal(data.engine,'local-ai-editorial-v3');
+  assert.equal(data.text,'이름을 적는 순간 죽는 공책이 정의감을 죽이기 시작하는 작품.');
+  assert.notEqual(data.text,data.controlText);
 });
 
 test('personal editorial v3 rejects late-plot spoilers and near-duplicate control copy', async () => {

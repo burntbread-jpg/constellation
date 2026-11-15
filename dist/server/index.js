@@ -168,7 +168,7 @@ const vectorLiteral=values=>`[${values.map(value=>(Number(value)||0).toFixed(4))
 function cosineSimilarity(a,b){let dot=0,aa=0,bb=0;for(let i=0;i<a.length;i++){dot+=a[i]*b[i];aa+=a[i]*a[i];bb+=b[i]*b[i]}return aa&&bb?dot/Math.sqrt(aa*bb):0}
 function analyzeTaste(work,myComment,rating){const source=[work.title,work.original_title,work.creator,work.description,...(work.tags||[]),myComment].filter(Boolean).join(' ').toLowerCase();const found=[];for(const [tag,category,words] of LEXICON){let hits=0;for(const word of words)if(source.includes(word.toLowerCase()))hits++;if(hits)found.push({tag,category,score:Math.min(.96,.62+hits*.08+(myComment.toLowerCase().includes(tag.toLowerCase())?.06:0)),evidence:words.find(w=>source.includes(w.toLowerCase()))||tag})}const preferred=FALLBACK[work.media_type]||FALLBACK.OTHER;let cursor=stableHash(`${work.id}:${myComment}`)%preferred.length;while(found.length<6){const tag=preferred[cursor%preferred.length],entry=LEXICON.find(x=>x[0]===tag);if(entry&&!found.some(x=>x.tag===tag))found.push({tag,category:entry[1],score:.58+((stableHash(work.id+tag)%23)/100),evidence:(work.tags||[])[0]||work.media_type});cursor++}found.sort((a,b)=>b.score-a.score);const tags=found.slice(0,8).map((x,i)=>({...x,score:Number(Math.max(.5,x.score-i*.015).toFixed(2))}));const [a,b]=tags;const reflection=myComment?`“${myComment.slice(0,72)}${myComment.length>72?'…':''}”라는 감상에서 ${a.tag}과 ${b.tag}의 결을 읽었습니다.`:`${work.title}에서 ${a.tag}과 ${b.tag}의 결이 가장 선명하게 드러납니다.`;return{engine:'metadata-lexicon-v1',generatedAt:new Date().toISOString(),rating,tags,aiComment:reflection,summary:`${a.tag}을 중심으로 ${b.tag}과 맞닿는 작품`,cost:'free'}}
 const LOCAL_AI_BLOCKED_HOSTS=new Set(['api.openai.com','api.anthropic.com','generativelanguage.googleapis.com','api.mistral.ai','api.cohere.com']);
-const EDITORIAL_PROMPT_VERSION='personal-editorial-v3-80';
+const EDITORIAL_PROMPT_VERSION='personal-editorial-v3-80-dedup';
 const EDITORIAL_SYNOPSIS_PATTERN=/여정을 그린|과정을 (?:그린|보여주는)|이야기를 그린|마주한다|찾아간다|나아간다|헤매(?:는|며)|되돌아보며|탐구한다|느낀다|깨닫는다|시작한다|고군분투|의미를 찾|정체성을 (?:찾|잃)|운명이 .*흔들|서로의 .*알아가|경계를 (?:묻|넘나든)|그린다\.?$/u;
 const EDITORIAL_GENERIC_PATTERN=/생각하게 하는|질문을 던지는|여운을 남기는|선명하게 드러|의미를 되새|본질을 탐구|복잡한 감정|다양한 모습|성장해 가는|감동을 주는|메시지를 전하는|고독한 여정/u;
 const EDITORIAL_SPOILER_PATTERN=/마지막 (?:메시지|유언)|죽음을 (?:되풀이|반복)|한편이 되|정체가 드러|범인은|결말에서|최후에|마침내 .*죽/u;
@@ -206,11 +206,19 @@ async function localAiCandidate(work,env,actor='shared',controlText=''){
           {role:'user',content:`/no_think\n${JSON.stringify({work:publicWork,controlText:String(controlText||'').slice(0,180),allowedTags:LEXICON.map(([tag])=>tag),output:{intro:'string',tags:[{tag:'string',score:.5}]}})}`}
         ]
       };
-      const response=await fetch(config.endpoint,{method:'POST',headers:{'content-type':'application/json',...(env.LOCAL_AI_BEARER_TOKEN?{authorization:`Bearer ${env.LOCAL_AI_BEARER_TOKEN}`}:{})},body:JSON.stringify(requestBody),signal:AbortSignal.timeout(8000)});
+      let response=await fetch(config.endpoint,{method:'POST',headers:{'content-type':'application/json',...(env.LOCAL_AI_BEARER_TOKEN?{authorization:`Bearer ${env.LOCAL_AI_BEARER_TOKEN}`}:{})},body:JSON.stringify(requestBody),signal:AbortSignal.timeout(8000)});
       if(!response.ok)return{intro:null,tags:[],model:config.model,outcome:`provider_${response.status}`};
-      const data=await response.json(),parsed=parseLocalAiJson(data?.choices?.[0]?.message?.content);
+      let data=await response.json(),parsed=parseLocalAiJson(data?.choices?.[0]?.message?.content);
       if(!parsed)return{intro:null,reviewIntro:null,tags:[],model:config.model,outcome:'invalid_json'};
-      const reviewIntro=reviewableLocalAiIntro(parsed.intro),intro=validateLocalAiIntro(parsed.intro,work,controlText),tags=validateLocalAiTags(parsed.tags);
+      if(editorialTextSimilarity(parsed.intro,controlText)>=.78){
+        const retryBody={...requestBody,temperature:.45,messages:[...requestBody.messages,{role:'assistant',content:JSON.stringify(parsed)},{role:'user',content:'방금 intro는 controlText와 같거나 지나치게 비슷하다. 같은 명사구·문장 구조·결말을 재사용하지 말고 work 메타데이터에서 다른 구체적 닻 하나를 골라 완전히 새 문장으로 한 번만 다시 작성하라. JSON만 반환하라.'}]};
+        response=await fetch(config.endpoint,{method:'POST',headers:{'content-type':'application/json',...(env.LOCAL_AI_BEARER_TOKEN?{authorization:`Bearer ${env.LOCAL_AI_BEARER_TOKEN}`}:{})},body:JSON.stringify(retryBody),signal:AbortSignal.timeout(8000)});
+        if(!response.ok)return{intro:null,reviewIntro:null,tags:[],model:config.model,outcome:`provider_${response.status}`};
+        data=await response.json();parsed=parseLocalAiJson(data?.choices?.[0]?.message?.content);
+        if(!parsed)return{intro:null,reviewIntro:null,tags:[],model:config.model,outcome:'invalid_json'};
+      }
+      const duplicated=editorialTextSimilarity(parsed.intro,controlText)>=.78,reviewIntro=duplicated?null:reviewableLocalAiIntro(parsed.intro),intro=duplicated?null:validateLocalAiIntro(parsed.intro,work,controlText),tags=validateLocalAiTags(parsed.tags);
+      if(duplicated)return{intro:null,reviewIntro:null,tags,model:config.model,outcome:'duplicate_control'};
       if(!intro&&tags.length<3)return{intro:null,reviewIntro,tags:[],model:config.model,outcome:'quality_gate_rejected'};
       return{intro,reviewIntro,tags,model:config.model,outcome:intro?'accepted':'tags_only'};
     }catch(error){
@@ -288,7 +296,7 @@ async function aiEditorialAbGuarded(request,env){
   if(run.created_by!==reviewer.id)return json({error:'이 개인 검수는 시작한 사람만 계속할 수 있습니다.'},403);
   const config=localAiConfig(env);
   if(!config.enabled)return json({error:'무료 AI 모델이 연결되지 않았습니다. 운영 설정을 먼저 확인해 주세요.',reason:config.reason},409);
-  let candidates=await supabase(env,`ai_editorial_ab_items?run_id=eq.${run.id}&select=*&order=id.asc`);const retryable=new Set(['pending','unavailable','provider_error','timeout','usage_limited','invalid_json']),isRetryable=item=>!item.candidate_text&&(retryable.has(item.candidate_outcome)||String(item.candidate_outcome||'').startsWith('config_')||String(item.candidate_outcome||'').startsWith('provider_'));let pending=(candidates||[]).filter(isRetryable).slice(0,5),appended=[];
+  let candidates=await supabase(env,`ai_editorial_ab_items?run_id=eq.${run.id}&select=*&order=id.asc`);const retryable=new Set(['pending','unavailable','provider_error','timeout','usage_limited','invalid_json','duplicate_control']),isRetryable=item=>!item.candidate_text&&(retryable.has(item.candidate_outcome)||String(item.candidate_outcome||'').startsWith('config_')||String(item.candidate_outcome||'').startsWith('provider_'));let pending=(candidates||[]).filter(isRetryable).slice(0,5),appended=[];
   if(pending.length<5){appended=await appendAiEditorialAbItems(env,run,candidates||[],5-pending.length);candidates=[...(candidates||[]),...appended];pending=(candidates||[]).filter(isRetryable).slice(0,5)}
   const results=[];
   for(const item of pending){
