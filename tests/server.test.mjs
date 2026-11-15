@@ -42,6 +42,7 @@ const state = {
   failHealth: false,
   failProviders: false,
   localAiMode: 'valid',
+  localAiDuplicateText: '',
   localAiCalls: [],
   aiAbRuns: [],
   aiAbItems: [],
@@ -405,8 +406,10 @@ test.before(() => {
           ? JSON.stringify({intro:'주인공이 여러 사건을 겪으며 자신의 정체성을 찾아간다. 작품.',tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'공간과 경계',score:.76}]})
           : state.localAiMode==='spoiler'
             ? JSON.stringify({intro:'캠코더에 남긴 마지막 메시지가 아버지의 죽음을 미리 말하는 작품.',tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'가족',score:.76}]})
+            : state.localAiMode==='multiRank'
+              ? JSON.stringify({candidates:[{intro:'주인공이 여러 사건을 겪으며 정체성을 찾아가는 작품.'},{intro:'이름을 적는 순간 죽는 공책이 정의감을 죽이기 시작하는 작품.'},{intro:'마지막 유언이 모든 반전을 밝히는 공책의 작품.'}],tags:[{tag:'정의와 죄책감',score:.88},{tag:'권력과 통제',score:.84},{tag:'존재와 죽음',score:.76}]})
             : state.localAiMode==='duplicate'||(state.localAiMode==='duplicateThenPreferred'&&!isDedupRetry)
-              ? JSON.stringify({intro:promptPayload.controlText,tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'공간과 경계',score:.76}]})
+              ? JSON.stringify({intro:state.localAiDuplicateText,tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'공간과 경계',score:.76}]})
               : state.localAiMode==='preferred'||state.localAiMode==='duplicateThenPreferred'
                 ? JSON.stringify({intro:'이름을 적는 순간 죽는 공책이 정의감을 죽이기 시작하는 작품.',tags:[{tag:'정의와 죄책감',score:.88},{tag:'권력과 통제',score:.84},{tag:'존재와 죽음',score:.76}]})
           : JSON.stringify({intro:'닫힌 방의 창문 하나로 기억과 상실의 거리를 재어 보는 작품.',tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'공간과 경계',score:.76}]});
@@ -526,6 +529,7 @@ test.beforeEach(() => {
   state.failHealth = false;
   state.failProviders = false;
   state.localAiMode = 'valid';
+  state.localAiDuplicateText = '';
   state.localAiCalls = [];
   state.aiAbRuns = [{id:1,name:'approved test',model:'local-test',target_work_count:40,status:'promoted',min_pass_rate:.8,max_spoilers:0,min_preference_uplift:.05,created_at:'2026-10-01T00:00:00Z',promoted_at:'2026-10-02T00:00:00Z'}];
   state.aiAbItems = [];
@@ -853,6 +857,20 @@ test('editorial intro preserves the curated Evangelion hook', async () => {
   assert.equal(data.engine, 'curated-editorial-v2');
 });
 
+test('a three-star reviewed line becomes the canonical editorial intro', async () => {
+  const result = await worker.fetch(new Request('https://site.test/api/editorial-intro', {
+    method: 'POST',
+    headers: {'content-type': 'application/json'},
+    body: JSON.stringify({work: {
+      id: 'anilist:1535', title: '데스노트', creator: '아라키 테츠로', mediaType: 'ANIME'
+    }})
+  }), env);
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.text, '이름을 적는 순간 죽는 공책이 정의감을 죽이기 시작하는 작품.');
+  assert.equal(data.engine, 'curated-editorial-v2');
+});
+
 test('curated editorial hooks never leak into a same-title different medium', async () => {
   const result = await worker.fetch(new Request('https://site.test/api/editorial-intro', {
     method: 'POST',
@@ -871,7 +889,7 @@ test('optional local AI accepts only zero-cost quality-gated public metadata', a
   const aiEnv={...env,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-test',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions'};
   const result=await worker.fetch(new Request('https://site.test/api/editorial-intro',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({work:{id:'book:ai-quality',title:'기억의 방',creator:'작가',mediaType:'BOOK',description:'닫힌 방에서 잃어버린 가족의 기억을 복원하는 소설',tags:['기억','상실']}})}),aiEnv),data=await result.json();
   assert.equal(result.status,200);
-  assert.equal(data.engine,'local-ai-editorial-v3');
+  assert.equal(data.engine,'local-ai-editorial-v4');
   assert.equal(data.cost,'free-local');
   assert.equal(data.guardrails.personalDataSent,false);
   assert.equal(data.guardrails.aiOutcome,'accepted');
@@ -903,30 +921,46 @@ test('personal editorial gate rejects synopsis copy learned from 80 reviews', as
   assert.equal(data.guardrails.fallback,true);
 });
 
-test('personal editorial v3 accepts the concrete single-reversal pattern learned from 80 reviews', async () => {
+test('personal editorial v4 accepts the concrete single-reversal pattern learned from 93 reviews', async () => {
   state.localAiMode='preferred';
   const aiEnv={...env,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-preferred-v3',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions'};
   const result=await worker.fetch(new Request('https://site.test/api/editorial-intro',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({work:{id:'book:preferred-v3',title:'심판의 공책',creator:'작가',mediaType:'BOOK',description:'이름을 적으면 사람이 죽는 공책을 얻은 학생이 정의를 실행하려 한다',tags:['정의와 죄책감','권력과 통제']}})}),aiEnv),data=await result.json();
   assert.equal(result.status,200);
-  assert.equal(data.engine,'local-ai-editorial-v3');
+  assert.equal(data.engine,'local-ai-editorial-v4');
   assert.equal(data.text,'이름을 적는 순간 죽는 공책이 정의감을 죽이기 시작하는 작품.');
-  assert.equal(data.guardrails.promptVersion,'personal-editorial-v3-80-dedup');
+  assert.equal(data.guardrails.promptVersion,'personal-editorial-v4-93-rerank');
 });
 
-test('personal editorial v3 retries copied control text once and keeps only a distinct replacement', async () => {
-  state.localAiMode='duplicateThenPreferred';
+test('personal editorial v4 retries copied control text once and keeps only a distinct replacement', async () => {
+  const work={id:'book:dedup-retry-v3',title:'심판의 공책',creator:'작가',mediaType:'BOOK',description:'이름을 적으면 사람이 죽는 공책을 얻은 학생이 정의를 실행하려 한다',tags:['정의와 죄책감','권력과 통제']};
+  const baseline=await worker.fetch(new Request('https://site.test/api/editorial-intro',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({work})}),env),baselineData=await baseline.json();
+  state.localAiMode='duplicateThenPreferred';state.localAiDuplicateText=baselineData.controlText;
   const aiEnv={...env,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-dedup-retry-v3',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions'};
   const callsBefore=state.localAiCalls.length;
-  const result=await worker.fetch(new Request('https://site.test/api/editorial-intro',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({work:{id:'book:dedup-retry-v3',title:'심판의 공책',creator:'작가',mediaType:'BOOK',description:'이름을 적으면 사람이 죽는 공책을 얻은 학생이 정의를 실행하려 한다',tags:['정의와 죄책감','권력과 통제']}})}),aiEnv),data=await result.json();
+  const result=await worker.fetch(new Request('https://site.test/api/editorial-intro',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({work})}),aiEnv),data=await result.json();
   assert.equal(result.status,200);
   assert.equal(state.localAiCalls.length-callsBefore,2);
-  assert.equal(data.engine,'local-ai-editorial-v3');
+  assert.equal(data.engine,'local-ai-editorial-v4');
   assert.equal(data.text,'이름을 적는 순간 죽는 공책이 정의감을 죽이기 시작하는 작품.');
   assert.notEqual(data.text,data.controlText);
 });
 
-test('personal editorial v3 rejects late-plot spoilers and near-duplicate control copy', async () => {
+test('personal editorial v4 reranks three diverse candidates and ignores synopsis and spoiler options', async () => {
+  state.localAiMode='multiRank';
+  const aiEnv={...env,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-rerank-v4',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions'};
+  const result=await worker.fetch(new Request('https://site.test/api/editorial-intro',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({work:{id:'book:rerank-v4',title:'심판의 공책',creator:'작가',mediaType:'BOOK',description:'이름을 적으면 사람이 죽는 공책을 얻은 학생이 정의를 실행하려 한다',tags:['정의와 죄책감','권력과 통제']}})}),aiEnv),data=await result.json();
+  assert.equal(result.status,200);
+  assert.equal(data.text,'이름을 적는 순간 죽는 공책이 정의감을 죽이기 시작하는 작품.');
+  assert.equal(data.guardrails.promptVersion,'personal-editorial-v4-93-rerank');
+  const sent=state.localAiCalls.at(-1).messages.at(-1).content;
+  assert.match(sent,/approvedExamples/);
+  assert.doesNotMatch(sent,/controlText/);
+});
+
+test('personal editorial v4 rejects late-plot spoilers and near-duplicate control copy', async () => {
   const work={id:'film:guard-v3',title:'오래된 캠코더',creator:'감독',mediaType:'FILM',description:'딸이 캠코더에 담긴 아버지와의 휴가를 되돌아본다',tags:['기억','상실','가족']};
+  const baseline=await worker.fetch(new Request('https://site.test/api/editorial-intro',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({work})}),env),baselineData=await baseline.json();
+  state.localAiDuplicateText=baselineData.controlText;
   for(const [mode,model] of [['spoiler','local-spoiler-v3'],['duplicate','local-duplicate-v3']]){
     state.localAiMode=mode;
     const aiEnv={...env,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:model,LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions'};
