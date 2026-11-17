@@ -400,19 +400,20 @@ test.before(() => {
       const payload=JSON.parse(init.body);state.localAiCalls.push(payload);
       if(state.localAiMode==='error')return response({error:'unavailable'},503);
       const promptPayload=JSON.parse(payload.messages.find(message=>message.role==='user'&&message.content.startsWith('/no_think')).content.replace(/^\/no_think\s*/,'')),isDedupRetry=payload.messages.length>2;
+      const evidence=String(promptPayload.work?.tags?.[0]||promptPayload.work?.title||'기억');
       const content=state.localAiMode==='invalid'
-        ? JSON.stringify({intro:'생각하게 하는 작품.',tags:['허용되지 않은 태그']})
+        ? JSON.stringify({intro:'생각하게 하는 작품.',anchorEvidence:evidence,tags:['허용되지 않은 태그']})
         : state.localAiMode==='synopsis'
-          ? JSON.stringify({intro:'주인공이 여러 사건을 겪으며 자신의 정체성을 찾아간다. 작품.',tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'공간과 경계',score:.76}]})
+          ? JSON.stringify({intro:'주인공이 여러 사건을 겪으며 자신의 정체성을 찾아간다. 작품.',anchorEvidence:evidence,tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'공간과 경계',score:.76}]})
           : state.localAiMode==='spoiler'
-            ? JSON.stringify({intro:'캠코더에 남긴 마지막 메시지가 아버지의 죽음을 미리 말하는 작품.',tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'가족',score:.76}]})
+            ? JSON.stringify({intro:'캠코더에 남긴 마지막 메시지가 아버지의 죽음을 미리 말하는 작품.',anchorEvidence:evidence,tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'가족',score:.76}]})
             : state.localAiMode==='multiRank'
-              ? JSON.stringify({candidates:[{intro:'주인공이 여러 사건을 겪으며 정체성을 찾아가는 작품.'},{intro:'이름을 적는 순간 죽는 공책이 정의감을 죽이기 시작하는 작품.'},{intro:'마지막 유언이 모든 반전을 밝히는 공책의 작품.'}],tags:[{tag:'정의와 죄책감',score:.88},{tag:'권력과 통제',score:.84},{tag:'존재와 죽음',score:.76}]})
+              ? JSON.stringify({candidates:[{intro:'주인공이 여러 사건을 겪으며 정체성을 찾아가는 작품.',anchorEvidence:'공책'},{intro:'이름을 적는 순간 죽는 공책이 정의감을 죽이기 시작하는 작품.',anchorEvidence:'공책'},{intro:'마지막 유언이 모든 반전을 밝히는 공책의 작품.',anchorEvidence:'공책'}],tags:[{tag:'정의와 죄책감',score:.88},{tag:'권력과 통제',score:.84},{tag:'존재와 죽음',score:.76}]})
             : state.localAiMode==='duplicate'||(state.localAiMode==='duplicateThenPreferred'&&!isDedupRetry)
-              ? JSON.stringify({intro:state.localAiDuplicateText,tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'공간과 경계',score:.76}]})
+              ? JSON.stringify({intro:state.localAiDuplicateText,anchorEvidence:evidence,tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'공간과 경계',score:.76}]})
               : state.localAiMode==='preferred'||state.localAiMode==='duplicateThenPreferred'
-                ? JSON.stringify({intro:'이름을 적는 순간 죽는 공책이 정의감을 죽이기 시작하는 작품.',tags:[{tag:'정의와 죄책감',score:.88},{tag:'권력과 통제',score:.84},{tag:'존재와 죽음',score:.76}]})
-          : JSON.stringify({intro:'닫힌 방의 창문 하나로 기억과 상실의 거리를 재어 보는 작품.',tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'공간과 경계',score:.76}]});
+                ? JSON.stringify({intro:'이름을 적는 순간 죽는 공책이 정의감을 죽이기 시작하는 작품.',anchorEvidence:evidence,tags:[{tag:'정의와 죄책감',score:.88},{tag:'권력과 통제',score:.84},{tag:'존재와 죽음',score:.76}]})
+          : JSON.stringify({intro:'닫힌 방의 창문 하나로 기억과 상실의 거리를 재어 보는 작품.',anchorEvidence:evidence,tags:[{tag:'기억',score:.88},{tag:'상실',score:.84},{tag:'공간과 경계',score:.76}]});
       return response({choices:[{message:{content}}]});
     }
     if (url === 'https://alerts.test/health') {state.webhookCalls.push(JSON.parse(init.body));return response({ok:true});}
@@ -889,7 +890,7 @@ test('optional local AI accepts only zero-cost quality-gated public metadata', a
   const aiEnv={...env,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-test',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions'};
   const result=await worker.fetch(new Request('https://site.test/api/editorial-intro',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({work:{id:'book:ai-quality',title:'기억의 방',creator:'작가',mediaType:'BOOK',description:'닫힌 방에서 잃어버린 가족의 기억을 복원하는 소설',tags:['기억','상실']}})}),aiEnv),data=await result.json();
   assert.equal(result.status,200);
-  assert.equal(data.engine,'local-ai-editorial-v4');
+  assert.equal(data.engine,'local-ai-editorial-v5');
   assert.equal(data.cost,'free-local');
   assert.equal(data.guardrails.personalDataSent,false);
   assert.equal(data.guardrails.aiOutcome,'accepted');
@@ -917,21 +918,21 @@ test('personal editorial gate rejects synopsis copy learned from 80 reviews', as
   const result=await worker.fetch(new Request('https://site.test/api/editorial-intro',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({work:{id:'film:synopsis',title:'경계의 방',creator:'감독',mediaType:'FILM',description:'닫힌 방에서 기억을 잃은 인물이 가족의 흔적을 찾는다',tags:['기억','상실']}})}),aiEnv),data=await result.json();
   assert.equal(result.status,200);
   assert.equal(data.engine,'metadata-editorial-v2');
-  assert.equal(data.guardrails.aiOutcome,'tags_only');
+  assert.equal(data.guardrails.aiOutcome,'quality_gate_rejected');
   assert.equal(data.guardrails.fallback,true);
 });
 
-test('personal editorial v4 accepts the concrete single-reversal pattern learned from 93 reviews', async () => {
+test('personal editorial v5 accepts a grounded concrete single-reversal pattern', async () => {
   state.localAiMode='preferred';
   const aiEnv={...env,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-preferred-v3',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions'};
   const result=await worker.fetch(new Request('https://site.test/api/editorial-intro',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({work:{id:'book:preferred-v3',title:'심판의 공책',creator:'작가',mediaType:'BOOK',description:'이름을 적으면 사람이 죽는 공책을 얻은 학생이 정의를 실행하려 한다',tags:['정의와 죄책감','권력과 통제']}})}),aiEnv),data=await result.json();
   assert.equal(result.status,200);
-  assert.equal(data.engine,'local-ai-editorial-v4');
+  assert.equal(data.engine,'local-ai-editorial-v5');
   assert.equal(data.text,'이름을 적는 순간 죽는 공책이 정의감을 죽이기 시작하는 작품.');
-  assert.equal(data.guardrails.promptVersion,'personal-editorial-v4-93-rerank');
+  assert.equal(data.guardrails.promptVersion,'personal-editorial-v5-120-grounded');
 });
 
-test('personal editorial v4 retries copied control text once and keeps only a distinct replacement', async () => {
+test('personal editorial v5 retries rejected text once and keeps only a grounded replacement', async () => {
   const work={id:'book:dedup-retry-v3',title:'심판의 공책',creator:'작가',mediaType:'BOOK',description:'이름을 적으면 사람이 죽는 공책을 얻은 학생이 정의를 실행하려 한다',tags:['정의와 죄책감','권력과 통제']};
   const baseline=await worker.fetch(new Request('https://site.test/api/editorial-intro',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({work})}),env),baselineData=await baseline.json();
   state.localAiMode='duplicateThenPreferred';state.localAiDuplicateText=baselineData.controlText;
@@ -940,24 +941,24 @@ test('personal editorial v4 retries copied control text once and keeps only a di
   const result=await worker.fetch(new Request('https://site.test/api/editorial-intro',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({work})}),aiEnv),data=await result.json();
   assert.equal(result.status,200);
   assert.equal(state.localAiCalls.length-callsBefore,2);
-  assert.equal(data.engine,'local-ai-editorial-v4');
+  assert.equal(data.engine,'local-ai-editorial-v5');
   assert.equal(data.text,'이름을 적는 순간 죽는 공책이 정의감을 죽이기 시작하는 작품.');
   assert.notEqual(data.text,data.controlText);
 });
 
-test('personal editorial v4 reranks three diverse candidates and ignores synopsis and spoiler options', async () => {
+test('personal editorial v5 reranks three grounded candidates and ignores synopsis and spoiler options', async () => {
   state.localAiMode='multiRank';
   const aiEnv={...env,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-rerank-v4',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions'};
   const result=await worker.fetch(new Request('https://site.test/api/editorial-intro',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({work:{id:'book:rerank-v4',title:'심판의 공책',creator:'작가',mediaType:'BOOK',description:'이름을 적으면 사람이 죽는 공책을 얻은 학생이 정의를 실행하려 한다',tags:['정의와 죄책감','권력과 통제']}})}),aiEnv),data=await result.json();
   assert.equal(result.status,200);
   assert.equal(data.text,'이름을 적는 순간 죽는 공책이 정의감을 죽이기 시작하는 작품.');
-  assert.equal(data.guardrails.promptVersion,'personal-editorial-v4-93-rerank');
+  assert.equal(data.guardrails.promptVersion,'personal-editorial-v5-120-grounded');
   const sent=state.localAiCalls.at(-1).messages.at(-1).content;
   assert.match(sent,/approvedExamples/);
   assert.doesNotMatch(sent,/controlText/);
 });
 
-test('personal editorial v4 rejects late-plot spoilers and near-duplicate control copy', async () => {
+test('personal editorial v5 rejects late-plot spoilers and near-duplicate control copy', async () => {
   const work={id:'film:guard-v3',title:'오래된 캠코더',creator:'감독',mediaType:'FILM',description:'딸이 캠코더에 담긴 아버지와의 휴가를 되돌아본다',tags:['기억','상실','가족']};
   const baseline=await worker.fetch(new Request('https://site.test/api/editorial-intro',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({work})}),env),baselineData=await baseline.json();
   state.localAiDuplicateText=baselineData.controlText;
@@ -1018,9 +1019,17 @@ test('A/B generation refuses an unconfigured model without consuming candidates'
   assert.equal(state.aiAbItems.filter(item=>item.candidate_outcome!=='pending').length,0);
 });
 
+test('A/B generation never exposes a quality-gate rejected draft', async () => {
+  state.aiAbRuns=[];state.aiAbItems=[];state.aiAbReviews=[];state.localAiMode='invalid';
+  const reviewerId='73737373-7373-4373-8373-737373737375',reviewerHeaders={'oai-authenticated-user-id':reviewerId,'content-type':'application/json'},reviewerEnv={...env,METADATA_REVIEWER_IDS:reviewerId,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-rejected',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions',LOCAL_AI_DAILY_LIMIT:'20',LOCAL_AI_HOURLY_PER_USER_LIMIT:'10'};
+  await worker.fetch(new Request('https://site.test/api/ai-editorial-ab',{method:'POST',headers:reviewerHeaders,body:JSON.stringify({action:'start'})}),reviewerEnv);
+  const generated=await worker.fetch(new Request('https://site.test/api/ai-editorial-ab',{method:'POST',headers:reviewerHeaders,body:JSON.stringify({action:'generate'})}),reviewerEnv),data=await generated.json();
+  assert.equal(generated.status,200);assert.equal(data.lastGeneration.accepted,0);assert.equal(state.aiAbItems.filter(item=>item.candidate_text).length,0);assert.equal(data.items.length,0);
+});
+
 test('40-work personal blinded review uses one creator and a three-point scale', async () => {
   state.aiAbRuns=[];state.aiAbItems=[];state.aiAbReviews=[];
-  const reviewerId='74747474-7474-4474-8474-747474747474',secondReviewerId='75757575-7575-4575-8575-757575757575',reviewerHeaders={'oai-authenticated-user-id':reviewerId,'content-type':'application/json'},secondHeaders={'oai-authenticated-user-id':secondReviewerId,'content-type':'application/json'},reviewerEnv={...env,METADATA_REVIEWER_IDS:`${reviewerId},${secondReviewerId}`,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-ab',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions',LOCAL_AI_DAILY_LIMIT:'50',LOCAL_AI_HOURLY_PER_USER_LIMIT:'10'};
+  const reviewerId='74747474-7474-4474-8474-747474747474',secondReviewerId='75757575-7575-4575-8575-757575757575',reviewerHeaders={'oai-authenticated-user-id':reviewerId,'content-type':'application/json'},secondHeaders={'oai-authenticated-user-id':secondReviewerId,'content-type':'application/json'},reviewerEnv={...env,METADATA_REVIEWER_IDS:`${reviewerId},${secondReviewerId}`,LOCAL_AI_ENABLED:'true',LOCAL_AI_ZERO_COST_ACK:'true',LOCAL_AI_MODEL:'local-ab',LOCAL_AI_CHAT_ENDPOINT:'https://local-ai.test/v1/chat/completions',LOCAL_AI_DAILY_LIMIT:'50',LOCAL_AI_HOURLY_PER_USER_LIMIT:'20'};
   const started=await worker.fetch(new Request('https://site.test/api/ai-editorial-ab',{method:'POST',headers:reviewerHeaders,body:JSON.stringify({action:'start'})}),reviewerEnv),startData=await started.json();
   assert.equal(started.status,201);assert.equal(startData.metrics.target,40);assert.equal(state.aiAbItems.length,40);assert.equal(new Set(state.aiAbItems.map(item=>item.control_text)).size,40);assert.match(state.aiAbItems.find(item=>item.title==='천공의 성 라퓨타').control_text,/문명이 왜 땅으로 돌아와야/);
   state.aiAbItems[0].candidate_outcome='unavailable';state.aiAbItems[1].candidate_outcome='config_disabled';
@@ -1042,9 +1051,16 @@ test('40-work personal blinded review uses one creator and a three-point scale',
   assert.equal(reviewed.status,200);assert.equal(reviewData.run.status,'promoted');assert.equal(reviewData.metrics.reviewed,40);assert.equal(reviewData.metrics.reviewCount,40);assert.equal(reviewData.metrics.uniqueReviewers,1);assert.equal(reviewData.metrics.passRate,1);assert.equal(reviewData.metrics.aiPassRate,1);assert.equal(reviewData.metrics.spoilers,0);assert.equal(reviewData.metrics.preferenceUplift,1);assert.equal(reviewData.metrics.promotable,true);
   const storedFinal=state.aiAbReviews.find(review=>review.item_id===finalItem.id&&review.reviewer_id===reviewerId);
   assert.equal(storedFinal.candidate_quality_pass,true);assert.equal(storedFinal.control_quality_pass,true);assert.equal(storedFinal.candidate_spoiler,false);assert.equal(storedFinal.control_spoiler,false);assert.equal(storedFinal.candidate_score,3);assert.equal(storedFinal.control_score,2);
-  for(let index=1;index<=5;index++)state.works.set(`film:continuation-${index}`,{id:`film:continuation-${index}`,title:`계속 검수 작품 ${index}`,creator:`감독 ${index}`,release_year:2020+index,media_type:'FILM',poster_url:`https://image.example/continuation-${index}.jpg`,description:`서로 다른 기억과 선택이 한 공간에서 충돌하며 관계의 방향을 바꾸는 영화 ${index}입니다.`,editorial_intro:`닫힌 공간 하나로 기억과 선택의 충돌을 선명하게 보여주는 작품.`,source:'TMDB',catalog_status:'verified',metadata_quality_score:100});
+  const continuationTitles=['겨울의 창','푸른 계단','낮의 별','유리 정원','먼 북소리'];
+  continuationTitles.forEach((title,index)=>state.works.set(`film:continuation-${index+1}`,{id:`film:continuation-${index+1}`,title,creator:`감독 ${index+1}`,release_year:2021+index,media_type:'FILM',poster_url:`https://image.example/continuation-${index+1}.jpg`,description:`서로 다른 기억과 선택이 한 공간에서 충돌하며 관계의 방향을 바꾸는 영화 ${index+1}입니다.`,editorial_intro:`닫힌 공간 하나로 기억과 선택의 충돌을 선명하게 보여주는 작품.`,source:'TMDB',catalog_status:'verified',metadata_quality_score:100}));
+  state.localAiMode='preferred';
   const continued=await worker.fetch(new Request('https://site.test/api/ai-editorial-ab',{method:'POST',headers:reviewerHeaders,body:JSON.stringify({action:'generate'})}),reviewerEnv),continuedData=await continued.json();
   assert.equal(continued.status,200);assert.equal(continuedData.lastGeneration.appended,5);assert.equal(continuedData.lastGeneration.accepted,5);assert.equal(continuedData.metrics.generated,45);assert.equal(continuedData.metrics.reviewed,40);assert.equal(continuedData.run.status,'promoted');assert.equal(state.aiAbItems.length,45);assert.equal(state.aiAbReviews.length,40);
+  state.works.set('film:her-en',{id:'film:her-en',title:'Her',original_title:'Her',creator:'스파이크 존즈',release_year:2013,media_type:'FILM',poster_url:'https://image.example/her-en.jpg',description:'편지를 대신 쓰는 남자가 인공지능 운영체제의 목소리와 가까워지는 영화입니다.',editorial_intro:'목소리와 사랑에 빠진 남자의 작품.',source:'TMDB',catalog_status:'verified',metadata_quality_score:99});
+  state.works.set('film:her-ko',{id:'film:her-ko',title:'그녀',original_title:'Her',creator:'스파이크 존즈',release_year:2013,media_type:'FILM',poster_url:'https://image.example/her-ko.jpg',description:'편지를 대신 쓰는 남자가 인공지능 운영체제의 목소리와 가까워지는 영화입니다.',editorial_intro:'목소리와 사랑에 빠진 남자의 작품.',source:'TMDB',catalog_status:'verified',metadata_quality_score:98});
+  state.works.set('book:law-guide',{id:'book:law-guide',title:'민사소송절차 해설',creator:'법률가',release_year:2025,media_type:'BOOK',poster_url:'https://image.example/law.jpg',description:'민사소송절차와 판례를 설명하는 법률 실무 해설서입니다.',editorial_intro:'민사소송 절차를 설명하는 책.',publishers:['출판사'],edition_verified:true,source:'Google Books',catalog_status:'verified',metadata_quality_score:100});
+  const deduped=await worker.fetch(new Request('https://site.test/api/ai-editorial-ab',{method:'POST',headers:reviewerHeaders,body:JSON.stringify({action:'generate'})}),reviewerEnv),dedupedData=await deduped.json();
+  assert.equal(deduped.status,200);assert.ok(dedupedData.lastGeneration.appended>=1);assert.equal(state.aiAbItems.slice(45).filter(item=>['Her','그녀'].includes(item.title)).length,1);assert.equal(state.aiAbItems.some(item=>item.title==='민사소송절차 해설'),false);
 });
 
 test('cultural context rejects an ambiguous Wikidata candidate', async () => {
